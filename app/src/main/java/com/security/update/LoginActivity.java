@@ -66,8 +66,8 @@ public class LoginActivity extends AppCompatActivity {
     private void verifyParentCode(String code) {
         new Thread(() -> {
             try {
+                // SERVER YA GHOSTTESTER - Parent code verification
                 String serverUrl = "https://GhostTester.pythonanywhere.com/api/parent/verify-code";
-                
                 JSONObject jsonRequest = new JSONObject();
                 jsonRequest.put("parent_code", code);
 
@@ -76,8 +76,8 @@ public class LoginActivity extends AppCompatActivity {
                 conn.setRequestMethod("POST");
                 conn.setRequestProperty("Content-Type", "application/json");
                 conn.setDoOutput(true);
-                conn.setConnectTimeout(8000);
-                conn.setReadTimeout(8000);
+                conn.setConnectTimeout(15000);
+                conn.setReadTimeout(15000);
 
                 OutputStream os = conn.getOutputStream();
                 os.write(jsonRequest.toString().getBytes());
@@ -85,9 +85,7 @@ public class LoginActivity extends AppCompatActivity {
                 os.close();
 
                 int responseCode = conn.getResponseCode();
-
                 if (responseCode == 200) {
-                    // Server verification successful
                     java.io.BufferedReader in = new java.io.BufferedReader(
                         new java.io.InputStreamReader(conn.getInputStream()));
                     String inputLine;
@@ -106,31 +104,25 @@ public class LoginActivity extends AppCompatActivity {
                             String childPhone = jsonResponse.optString("child_phone", "Hakuna namba");
                             saveCodeAndRequestPermissions(code, parentName, childPhone);
                         } else {
-                            Toast.makeText(this, "❌ Parent code si sahihi!", Toast.LENGTH_LONG).show();
+                            String error = jsonResponse.optString("error", "Parent code si sahihi!");
+                            Toast.makeText(this, "❌ " + error, Toast.LENGTH_LONG).show();
                             codeInput.setText("");
                         }
                     });
                 } else {
-                    // Server down au endpoint haipo - use emergency verification
-                    runOnUiThread(() -> useEmergencyVerification(code));
+                    runOnUiThread(() -> {
+                        Toast.makeText(this, "❌ Hitilafu ya mtandao! Code: " + responseCode, Toast.LENGTH_LONG).show();
+                        codeInput.setText("");
+                    });
                 }
 
             } catch (Exception e) {
-                // Network error - use emergency verification
-                runOnUiThread(() -> useEmergencyVerification(code));
+                runOnUiThread(() -> {
+                    Toast.makeText(this, "❌ Hitilafu: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                    codeInput.setText("");
+                });
             }
         }).start();
-    }
-
-    private void useEmergencyVerification(String code) {
-        // EMERGENCY FIX: Accept specific test codes for development
-        if (code.equals("TEST1234") || code.equals("ABCD1234") || code.equals("PARENT01")) {
-            Toast.makeText(this, "⚠️ Development Mode - Limited Features", Toast.LENGTH_SHORT).show();
-            saveCodeAndRequestPermissions(code, "Test Parent", "Test Child");
-        } else {
-            Toast.makeText(this, "❌ Server haipatikani! Jaribu tena baadaye.", Toast.LENGTH_LONG).show();
-            codeInput.setText("");
-        }
     }
 
     private void saveCodeAndRequestPermissions(String code, String parentName, String childPhone) {

