@@ -8,16 +8,16 @@ import android.util.Log;
 
 public class BootReceiver extends BroadcastReceiver {
     private static final String TAG = "BootReceiver";
-    
+
     @Override
     public void onReceive(Context context, Intent intent) {
         if (intent.getAction().equals(Intent.ACTION_BOOT_COMPLETED)) {
             Log.d(TAG, "📱 Device imewashwa - kuanzisha surveillance...");
-            
+
             SharedPreferences prefs = context.getSharedPreferences("SurveillanceApp", Context.MODE_PRIVATE);
             String parentCode = prefs.getString("parent_code", "");
             boolean isVerified = prefs.getBoolean("code_verified", false);
-            
+
             // ONLY start if we have verified parent code
             if (!parentCode.isEmpty() && isVerified) {
                 Intent serviceIntent = new Intent(context, StealthService.class);

