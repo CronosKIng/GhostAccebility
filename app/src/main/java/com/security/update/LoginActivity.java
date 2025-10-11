@@ -66,7 +66,6 @@ public class LoginActivity extends AppCompatActivity {
     private void verifyParentCode(String code) {
         new Thread(() -> {
             try {
-                // SERVER YA GHOSTTESTER - Parent code verification
                 String serverUrl = "https://GhostTester.pythonanywhere.com/api/parent/verify-code";
                 JSONObject jsonRequest = new JSONObject();
                 jsonRequest.put("parent_code", code);

