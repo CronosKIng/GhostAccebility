@@ -5,5 +5,5 @@ pluginManagement {
         gradlePluginPortal()
     }
 }
-rootProject.name = "SurveillanceApp"
+rootProject.name = "GhostApp"
 include ':app'
