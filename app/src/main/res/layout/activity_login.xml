@@ -3,58 +3,25 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="#1a1a1a"
-    android:padding="20dp">
-
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="SYSTEM UPDATE"
-        android:textColor="#ffffff"
-        android:textSize="24sp"
-        android:textStyle="bold"
-        android:gravity="center"
-        android:layout_marginTop="50dp"
-        android:layout_marginBottom="30dp" />
-
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Weka Parent Code:"
-        android:textColor="#cccccc"
-        android:textSize="16sp"
-        android:layout_marginBottom="10dp" />
+    android:padding="16dp"
+    android:background="#000000">
 
     <EditText
         android:id="@+id/codeInput"
         android:layout_width="match_parent"
-        android:layout_height="50dp"
-        android:background="#333333"
-        android:textColor="#ffffff"
-        android:textSize="18sp"
-        android:padding="10dp"
-        android:maxLength="8"
-        android:inputType="textCapCharacters"
-        android:hint="Weka code ya mzazi (8 herufi)"
-        android:hintTextColor="#666666" />
+        android:layout_height="wrap_content"
+        android:hint="Enter Parent Code"
+        android:textColor="#FFFFFF"
+        android:textColorHint="#AAAAAA"
+        android:backgroundTint="#FFFFFF"
+        android:layout_marginBottom="16dp" />
 
     <Button
         android:id="@+id/submitButton"
         android:layout_width="match_parent"
-        android:layout_height="50dp"
-        android:text="Ingiza Code"
-        android:textColor="#ffffff"
-        android:background="#007acc"
-        android:textSize="16sp"
-        android:layout_marginTop="20dp" />
-
-    <TextView
-        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="ℹ️ Code unapatikana kwenye akaunti yako ya GhostTester"
-        android:textColor="#666666"
-        android:textSize="12sp"
-        android:gravity="center"
-        android:layout_marginTop="30dp" />
+        android:text="Verify Code"
+        android:backgroundTint="#4CAF50"
+        android:textColor="#FFFFFF" />
 
 </LinearLayout>
