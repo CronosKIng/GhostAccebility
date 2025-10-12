@@ -35,7 +35,7 @@ public class UninstallProtectionActivity extends Activity {
             String savedCode = prefs.getString("parent_code", "");
             
             if (enteredCode.equals(savedCode)) {
-                // 🔓 KUBALI KUFUTA - FICHA APP KABLA YA KUFUTA
+                // Kubali kufuta - futa data zote
                 SharedPreferences.Editor editor = prefs.edit();
                 editor.clear();
                 editor.apply();
@@ -44,15 +44,12 @@ public class UninstallProtectionActivity extends Activity {
                 Intent serviceIntent = new Intent(this, StealthService.class);
                 stopService(serviceIntent);
                 
-                Toast.makeText(this, "✅ App imefutwa kikamilifu", Toast.LENGTH_LONG).show();
+                Toast.makeText(this, "App imefutwa kikamilifu", Toast.LENGTH_LONG).show();
                 finish();
-                
-                // 🔚 ISHA APP
-                android.os.Process.killProcess(android.os.Process.myPid());
             } else {
                 Toast.makeText(this, "❌ Msimbo si sahihi! App haifutiki.", Toast.LENGTH_LONG).show();
                 
-                // 🔒 RUDISHA KWENYE STEALTH MODE
+                // Rudisha kwenye stealth mode
                 Intent stealthIntent = new Intent(this, StealthService.class);
                 stealthIntent.putExtra("PARENT_CODE", savedCode);
                 startService(stealthIntent);
@@ -65,14 +62,7 @@ public class UninstallProtectionActivity extends Activity {
     
     @Override
     public void onBackPressed() {
-        // 🔒 USIRUHUSU KURUDI - RUDISHA KWENYE BACKGROUND
-        String savedCode = prefs.getString("parent_code", "");
-        if (!savedCode.isEmpty()) {
-            Intent stealthIntent = new Intent(this, StealthService.class);
-            stealthIntent.putExtra("PARENT_CODE", savedCode);
-            startService(stealthIntent);
-        }
+        // Usiruhusu kurudi - rudisha kwenye background
         moveTaskToBack(true);
-        finish();
     }
 }

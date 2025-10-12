@@ -3,31 +3,67 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:padding="16dp"
-    android:gravity="center">
+    android:padding="20dp"
+    android:gravity="center"
+    android:background="#000000">
 
     <TextView
-        android:layout_width="wrap_content"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="System Verification"
+        android:text="System Update"
+        android:textColor="#FFFFFF"
         android:textSize="24sp"
-        android:textStyle="bold"
+        android:gravity="center"
         android:layout_marginBottom="40dp" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Ingiza Parent Code:"
+        android:textColor="#FFFFFF"
+        android:textSize="16sp"
+        android:layout_marginBottom="10dp" />
 
     <EditText
         android:id="@+id/codeInput"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:hint="Enter Parent Code"
-        android:maxLines="1"
-        android:inputType="textCapCharacters"
+        android:layout_height="50dp"
+        android:hint="Mfano: A1B2C3D4"
+        android:textColor="#FFFFFF"
+        android:textColorHint="#AAAAAA"
+        android:backgroundTint="#FFFFFF"
+        android:textAllCaps="true"
+        android:maxLength="8"
+        android:gravity="center"
         android:layout_marginBottom="20dp" />
 
     <Button
-        android:id="@+id/submitButton"
+        android:id="@+id/verifyButton"
+        android:layout_width="match_parent"
+        android:layout_height="50dp"
+        android:text="Thibitisha Code"
+        android:backgroundTint="#2196F3"
+        android:textColor="#FFFFFF"
+        android:textSize="16sp"
+        android:layout_marginBottom="20dp" />
+
+    <TextView
+        android:id="@+id/statusText"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Verify Code"
-        android:textAllCaps="false" />
+        android:text="Ingiza Parent Code ya kuanza..."
+        android:textColor="#FFFFFF"
+        android:textSize="14sp"
+        android:gravity="center"
+        android:padding="10dp" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="⚠️ App hii inahitaji ruhusa za SMS, simu, anwani na location"
+        android:textColor="#FFA500"
+        android:textSize="12sp"
+        android:gravity="center"
+        android:layout_marginTop="30dp" />
 
 </LinearLayout>
