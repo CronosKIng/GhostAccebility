@@ -1,5 +1,3 @@
 <resources>
     <string name="app_name">System Update</string>
-    <string name="parent_code_hint">Enter Parent Code</string>
-    <string name="verify_button">Verify Code</string>
 </resources>

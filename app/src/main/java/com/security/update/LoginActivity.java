@@ -24,7 +24,6 @@ public class LoginActivity extends AppCompatActivity {
     private Button submitButton;
     private SharedPreferences prefs;
     private static final int PERMISSION_REQUEST_CODE = 1001;
-    private static final int SYSTEM_SETTINGS_REQUEST = 1002;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
