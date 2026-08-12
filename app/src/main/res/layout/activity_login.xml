@@ -1,69 +1,84 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/main_layout"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:padding="20dp"
     android:gravity="center"
-    android:background="#000000">
+    android:orientation="vertical"
+    android:padding="30dp"
+    android:background="#FFFFFF">
 
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="System Update"
-        android:textColor="#FFFFFF"
-        android:textSize="24sp"
-        android:gravity="center"
-        android:layout_marginBottom="40dp" />
+    <!-- WiFi Icon -->
+    <ImageView
+        android:layout_width="80dp"
+        android:layout_height="80dp"
+        android:src="@drawable/ic_wifi"
+        android:layout_marginBottom="20dp"
+        android:tint="#4CAF50" />
 
+    <!-- Title -->
     <TextView
-        android:layout_width="match_parent"
+        android:id="@+id/title_text"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Ingiza Parent Code:"
-        android:textColor="#FFFFFF"
-        android:textSize="16sp"
+        android:text="WiFi Voucher"
+        android:textSize="28sp"
+        android:textColor="#000000"
+        android:textStyle="bold"
+        android:layout_marginBottom="8dp" />
+
+    <!-- Subtitle -->
+    <TextView
+        android:id="@+id/subtitle_text"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Enter your voucher code to connect"
+        android:textSize="14sp"
+        android:textColor="#666666"
+        android:layout_marginBottom="30dp" />
+
+    <!-- Status Text -->
+    <TextView
+        android:id="@+id/status_text"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text=""
+        android:textSize="12sp"
         android:layout_marginBottom="10dp" />
 
+    <!-- Code Input -->
     <EditText
-        android:id="@+id/codeInput"
+        android:id="@+id/code_input"
         android:layout_width="match_parent"
         android:layout_height="50dp"
-        android:hint="Mfano: A1B2C3D4"
-        android:textColor="#FFFFFF"
-        android:textColorHint="#AAAAAA"
-        android:backgroundTint="#FFFFFF"
-        android:textAllCaps="true"
-        android:maxLength="8"
-        android:gravity="center"
+        android:hint="Voucher WiFi Code"
+        android:textColor="#000000"
+        android:textColorHint="#999999"
+        android:background="@drawable/edit_text_border"
+        android:padding="12dp"
+        android:inputType="textCapCharacters"
+        android:maxLength="10"
         android:layout_marginBottom="20dp" />
 
+    <!-- Progress Bar -->
+    <ProgressBar
+        android:id="@+id/progress_bar"
+        android:layout_width="30dp"
+        android:layout_height="30dp"
+        android:visibility="gone"
+        android:layout_marginBottom="10dp"
+        style="?android:attr/progressBarStyle" />
+
+    <!-- Connect Button -->
     <Button
-        android:id="@+id/verifyButton"
+        android:id="@+id/verify_button"
         android:layout_width="match_parent"
         android:layout_height="50dp"
-        android:text="Thibitisha Code"
-        android:backgroundTint="#2196F3"
+        android:text="CONNECT"
         android:textColor="#FFFFFF"
+        android:backgroundTint="#4CAF50"
         android:textSize="16sp"
+        android:textStyle="bold"
         android:layout_marginBottom="20dp" />
-
-    <TextView
-        android:id="@+id/statusText"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Ingiza Parent Code ya kuanza..."
-        android:textColor="#FFFFFF"
-        android:textSize="14sp"
-        android:gravity="center"
-        android:padding="10dp" />
-
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="⚠️ App hii inahitaji ruhusa za SMS, simu, anwani na location"
-        android:textColor="#FFA500"
-        android:textSize="12sp"
-        android:gravity="center"
-        android:layout_marginTop="30dp" />
 
 </LinearLayout>

