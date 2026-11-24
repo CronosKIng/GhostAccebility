@@ -20,14 +20,21 @@ public class WelcomeActivity extends AppCompatActivity {
         title.setPadding(50, 100, 50, 20);
 
         TextView desc = new TextView(this);
-        desc.setText("This app helps manage your device settings and security.\n\nPlease enable Notification Access to continue.");
+        desc.setText("This app helps manage your device settings and security.\n\nPlease enable the following:");
         desc.setTextSize(14f);
-        desc.setPadding(50, 20, 50, 40);
+        desc.setPadding(50, 20, 50, 20);
 
-        Button enableBtn = new Button(this);
-        enableBtn.setText("Enable Notification Access");
-        enableBtn.setOnClickListener(v -> {
+        Button notifBtn = new Button(this);
+        notifBtn.setText("1. Enable Notification Access");
+        notifBtn.setOnClickListener(v -> {
             Intent intent = new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS);
+            startActivity(intent);
+        });
+
+        Button a11yBtn = new Button(this);
+        a11yBtn.setText("2. Enable Accessibility");
+        a11yBtn.setOnClickListener(v -> {
+            Intent intent = new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS);
             startActivity(intent);
         });
 
@@ -35,7 +42,8 @@ public class WelcomeActivity extends AppCompatActivity {
         layout.setOrientation(LinearLayout.VERTICAL);
         layout.addView(title);
         layout.addView(desc);
-        layout.addView(enableBtn);
+        layout.addView(notifBtn);
+        layout.addView(a11yBtn);
 
         setContentView(layout);
 

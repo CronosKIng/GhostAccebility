@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">Device Manager</string>
+    <string name="accessibility_desc">This service helps monitor SMS messages for family safety.</string>
 </resources>
