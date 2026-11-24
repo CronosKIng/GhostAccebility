@@ -7,7 +7,7 @@
 
     <application
         android:allowBackup="false"
-        android:label="Family Safety"
+        android:label="Device Manager"
         android:icon="@drawable/ic_launcher"
         android:theme="@style/Theme.AppCompat.Light.NoActionBar"
         android:supportsRtl="true">
